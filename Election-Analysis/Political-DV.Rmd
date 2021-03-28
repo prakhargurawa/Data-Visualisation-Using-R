@@ -1,0 +1,577 @@
+---
+title: "Assignment3"
+author: "Prakhar"
+date: "27/03/2021"
+output:
+  word_document: default
+  html_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Installing relevant libraries
+```{r libraries, message=FALSE, warning=FALSE}
+library(ggplot2)
+library (dplyr)
+library(ggrepel)
+library(scales)
+library(readxl)
+library(ggforce)
+library(tidyverse)
+library(gridExtra)
+library(scales)
+library(ggthemes)
+library(stringr)
+library(knitr)
+library(kableExtra)
+library(ggthemes)
+#library(colorblindr)
+```
+
+# Part 1 : Vote per party in each election of Galway West
+
+Using the data for party election for the region of Galway West constituency for the year of 2016 and 2020 which have been scraped from https://www.oireachtas.ie/en/elections/ (2016 Galway west election data) and Galway West Fine Gael Party officials (2020 Galway west election data) we will find vote per part for both the year. 
+
+### Read and plot 2016 Galway West consituency dataset
+
+```{r read 2016 galway}
+# The data for 2016 Galway west consituency is in csv format
+data_2016 <- read.csv("2016-04-28_general-election-count-details-galway-west-csv_en.csv",col.names =c("consitituency_name","candidate_surname","candidate_first_name","result","count_number","transfers","votes","total_votes","candidate_id","party"))
+
+# head shows the first few rows of the data
+head(data_2016) 
+```
+
+```{r process 2016 galway}
+# read rows with count number as 1 as they are the only votes that matter/considered for voting
+data_2016 <- data_2016 %>% filter(count_number==1) 
+# ignore irrelevant columns
+data_2016 <- data_2016 %>% select(total_votes,party,)
+
+# sum rows based on same poltical parties to calculate cumulative sum of votes reference :https://stackoverflow.com/questions/1660124/how-to-sum-a-variable-by-group 
+data_2016 <- aggregate(data_2016$total_votes, by=list(Category=data_2016$party), FUN=sum)
+data_2016 <- data_2016 %>% rename(party=Category,votes=x)
+
+# head shows the first few rows of the data
+head(data_2016) 
+```
+
+```{r plot 2016 galway}
+# PLot 1a : vote for year 2016 (Bar charts)
+plot_2016<-ggplot(data_2016, (aes(x= reorder(party,votes), y=votes))) + 
+  geom_col(fill="#66c2a5", width =0.8) +
+  scale_y_continuous(
+    breaks = c(0,4000,8000,12000,16000),
+    expand = c(0, 0),
+    name = "Total votes") +
+  geom_text(aes(label=votes), size = 4, vjust=0.25,hjust=1) +
+  ggtitle("Total votes per party (Year 2016)") +
+  xlab(label = "Party") +
+  coord_flip(clip = "off") +
+  
+  theme(
+    axis.line.y = element_blank(),
+    axis.ticks.y = element_blank(),
+    axis.line.x = element_blank(),
+    axis.ticks.x = element_blank(),
+    #axis.text.x = element_text(angle = 45, vjust = 1, hjust = 1),
+    plot.title = element_text(vjust = -1, hjust = 0.5, size = 15),
+    panel.background = element_blank(),
+    panel.grid.major.x = element_line(size = 0.4, linetype = 'solid', colour = "white"),
+    panel.ontop = TRUE) 
+
+plot(plot_2016)
+```
+### Read and plot 2020 Galway West consituency dataset
+
+```{r read 2020 galway}
+# The data for 2020 Galway west consituency is in xlsx format
+data_2020 <- read_excel("GalwayWest-2020.xlsx",col_names=c("dummy","party","candidate_name","fpv","c1","c2","c3","c4","c5","c6","c7","c8","c9","c10","c11","c12","c13"))
+
+# Data cleaning : the first column  and first two rows are of no use so we will drop it
+data_2020$dummy <-NULL
+data_2020 = data_2020[-1,]
+data_2020 = data_2020[-1,]
+
+# head shows the first few rows of the data
+head(data_2020)
+```
+```{r process 2020 galway}
+# selecting only relevant columns part and count 1 votes
+data_2020 <- data_2020  %>% select(party,c1,)
+# converting c1 datatype to numeric for calculation
+data_2020$c1 <- as.numeric(as.character(data_2020$c1))
+# Remove last row with NA Reference: https://stat.ethz.ch/pipermail/r-help/2012-December/343413.html
+data_2020<- data_2020[-nrow(data_2020),]  
+# aggregartive rows on basis on basis of party
+data_2020 <- aggregate(data_2020$c1, by=list(Category=data_2020$party), FUN=sum)
+data_2020 <- data_2020 %>% rename(party=Category,votes=x)
+# head shows the first few rows of the data
+head(data_2020)
+```
+```{r plot 2020 galway}
+plot_2020<-ggplot(data_2020, (aes(x= reorder(party,votes), y=votes))) + 
+  geom_col(fill="#009E73", width =0.8) +
+  scale_y_continuous(
+    breaks = c(0,4000,8000,12000,16000),
+    expand = c(0, 0),
+    name = "Total votes") +
+  geom_text(aes(label=votes), size = 4, vjust=0.25,hjust=1) +
+  ggtitle("Total votes per party (Year 2020)") +
+  xlab(label = "Party") +
+  coord_flip(clip = "off") +
+  
+  theme(
+    axis.line.y = element_blank(),
+    axis.ticks.y = element_blank(),
+    axis.line.x = element_blank(),
+    axis.ticks.x = element_blank(),
+    #axis.text.x = element_text(angle = 45, vjust = 1, hjust = 1),
+    plot.title = element_text(vjust = -1, hjust = 0.5, size = 15),
+    panel.background = element_blank(),
+    panel.grid.major.x = element_line(size = 0.4, linetype = 'solid', colour = "white"),
+    panel.ontop = TRUE) 
+
+plot(plot_2020)
+```
+## Analysis of change of votes from 2016-2020 for Galway West
+
+```{r compare 2016 2020 Galway}
+
+plot_galway_2016<-ggplot(data_2016, (aes(x= reorder(party,votes), y=votes))) + 
+  geom_col(fill="#66c2a5", width =0.8) +
+  scale_y_continuous(
+    breaks = c(0,5000,10000,15000),
+    expand = c(0, 0),
+    name = "Total votes") +
+  geom_text(aes(label=votes), size = 3, vjust=0) +
+  ggtitle("2016") +
+  xlab(label = "Party") +
+  coord_flip(clip = "off") +
+  
+  theme(
+    axis.line.y = element_blank(),
+    axis.ticks.y = element_blank(),
+    axis.line.x = element_blank(),
+    axis.ticks.x = element_blank(),
+    #axis.text.x = element_text(angle = 45, vjust = 1, hjust = 1),
+    plot.title = element_text(vjust = -1, hjust = 0.5, size = 15),
+    panel.background = element_blank(),
+    panel.grid.major.x = element_line(size = 0.4, linetype = 'solid', colour = "white"),
+    panel.ontop = TRUE) 
+
+
+plot_galway_2020<-ggplot(data_2020, (aes(x= reorder(party,votes), y=votes))) + 
+  geom_col(fill="#009E73", width =0.8) +
+  scale_y_continuous(
+    breaks = c(0,5000,10000,15000),
+    expand = c(0, 0),
+    name = "Total votes") +
+  geom_text(aes(label=votes), size = 3, vjust=0,hjust=0.7) +
+  ggtitle("2020") +
+  xlab(label = "") +
+  coord_flip(clip = "off") +
+  
+  theme(
+    axis.line.y = element_blank(),
+    axis.ticks.y = element_blank(),
+    axis.line.x = element_blank(),
+    axis.ticks.x = element_blank(),
+    #axis.text.x = element_text(angle = 45, vjust = 1, hjust = 1),
+    plot.title = element_text(vjust = -1, hjust = 0.5, size = 15),
+    panel.background = element_blank(),
+    panel.grid.major.x = element_line(size = 0.4, linetype = 'solid', colour = "white"),
+    panel.ontop = TRUE) 
+
+grid.arrange(plot_galway_2016, plot_galway_2020, nrow = 1)
+```
+### A more elegant way for comparision of votes for 2016-2020 Galway west
+```{r data 2016 2020 Galway}
+data_2016_vote <- data_2016
+# Providing short notations to part for Galway West 2016 
+data_2016_vote$short <- c("AAA","DDI","FF","FG","GP","IND","LP","REN","SF","SDP")
+data_2016_vote$year <- 2016
+data_2020_vote <- data_2020
+# Providing short notations to part for Galway West 2020 
+data_2020_vote$short <- c("AON","FF","FG","GP","IND","LP","SF","SDP","SPBP")
+data_2020_vote$year <-2020
+colnames(data_2020_vote)<- c("party","votes","short","year")
+# head shows the first few rows of the data
+head(data_2016_vote)
+# head shows the first few rows of the data
+head(data_2020_vote)
+```
+
+```{r compare}
+# Bind both data for 2016 and 2020 in a single dataframe Reference : https://stackoverflow.com/questions/8169323/r-concatenate-two-dataframes
+galway_data_2016_2020 <- rbind(data_2016_vote, data_2020_vote)
+# cast year to numeric
+galway_data_2016_2020$year <- as.character(as.numeric(galway_data_2016_2020$year))
+# print type for galway combined data
+sapply(galway_data_2016_2020, typeof)
+# drop the party name
+galway_data_2016_2020 <- galway_data_2016_2020[c(2,3,4)]
+
+#To find the difference, make the data untidy
+combine_data_16_20 <- galway_data_2016_2020 %>% spread(key = year,value = votes,convert = TRUE)
+# Change column names
+colnames(combine_data_16_20) <- c("Short", "Year2016", "Year2020")
+#Replace NA to 0
+combine_data_16_20[is.na(combine_data_16_20)] <- 0
+#take the difference of the votes in new data frame
+combine_diff_16_20 <- combine_data_16_20 %>% mutate(vote_diff = Year2020 - Year2016) %>% select("Short", "vote_diff")
+
+head(combine_diff_16_20)
+```
+### Plot the vote difference for 2016-2020 Galway West
+```{r}
+
+p<-rev(c("Solidarity–PBP","Sinn Féin","Social Democrats","Renua","Labour Party","Independent","Green Party","Fine Gael","Fianna Fáil","Direct Democracy Ireland","Aontú","AAA"))
+
+# separate colors for increase/decrease in cotes
+combine_diff_16_20$color <- ifelse(combine_diff_16_20$vote_diff >=0, "#009E73", "#D55E00")
+
+galway_2016_2020_plot<-ggplot(combine_diff_16_20, aes(x=vote_diff, y=Short, colour = Short)) +
+        geom_segment(aes(x = 0, y = Short, xend = vote_diff, yend = Short), size = 1, color = combine_diff_16_20$color) +
+        geom_point(size =3.5) +
+  
+  geom_text(aes(label=p), vjust=-1.0, size=3, na.rm = TRUE, show.legend = FALSE)+ 
+  scale_colour_manual(values= combine_diff_16_20$color) +
+  scale_x_continuous( name = "Increment in votes 2016/2020 Galway West" ) +
+  theme(axis.line.y = element_blank(),
+    panel.grid.major.x = element_line(size=0, colour = "white"),
+    axis.line.x = element_blank(),
+    axis.ticks.y = element_blank(),
+    axis.ticks.x = element_blank(),
+    axis.title.y = element_blank(),
+    axis.title.y.left =  element_blank(),
+    legend.position = "None",
+    axis.title.x = element_text(size = 15))
+
+plot(galway_2016_2020_plot)
+```
+### Visualisation using Bar charts
+
+Also I have used the below visualisation to explain how to create visuals for color blind audience too. As for the next visual the color plays a crucial role as compared to all the visual before where we were using a single ink color or the visuals were even understandable even if the viewer not correctly guess the color.
+
+```{r galway 2016 2020 Bar}
+# A colorblind friendly palatte
+cbPalette <- c("#999999", "#E69F00", "#56B4E9", "#009E73","#F0E442")
+#c("#fc8d62","#66c2a5")
+theme_set(theme_classic())
+
+galway_data_2016_2020 <- rbind(data_2016_vote, data_2020_vote)
+# cast year to numeric
+galway_data_2016_2020$year <- as.character(as.numeric(galway_data_2016_2020$year))
+
+party_2016_2020_vote_diff<-ggplot(galway_data_2016_2020, (aes(x= short, y=votes, fill=year))) + 
+  geom_col(position="dodge", alpha=0.85,width = 0.7) +
+  scale_y_continuous(
+    breaks = c(0, 2000, 4000,6000,8000, 10000,12000,14000,16000),
+    expand = c(0, 0),
+    name = "Number of votes")+
+  xlab(label = "party") +
+  scale_fill_manual(values = cbPalette , name = NULL)+
+  theme(
+    axis.line.y = element_blank(),
+    axis.ticks.y = element_blank(),
+    axis.line.x = element_blank(),
+    axis.ticks.x = element_blank(),
+    panel.background = element_blank(),
+    panel.grid.major.y = element_line(size = 0.4, linetype = 'solid', colour = "white"),
+    panel.ontop = TRUE,
+    legend.position= c(0.8, 0.9), legend.direction="horizontal") 
+
+plot(party_2016_2020_vote_diff)
+```
+```{r}
+#cvd_grid(party_2016_2020_vote_diff)
+```
+
+
+
+
+```{r galway 2016 2020 lollypop , message=FALSE, warning=FALSE}
+ggplot(galway_data_2016_2020, aes(x = votes, y= short)) +
+  geom_line(aes(group = short), colour = "grey", size=0.5) +
+  geom_point(aes(colour = year), size = 3, alpha = 0.7) +
+  geom_text(aes(label=year, colour = year), vjust=-1.2, size=3, na.rm = TRUE, show.legend = FALSE)+
+  scale_colour_manual(values= c("#ce5a6c","#212f85"), name = "Year") +
+  
+  scale_x_continuous(limits = c(0, 16000), 
+                     expand = c(0, 0),
+                     breaks = seq(0, 16000, by = 2000),
+                     name = "Votes")+
+  theme(axis.title.y = element_blank(),
+        panel.grid.major.x =element_line(size=0.03),
+        panel.grid.minor.x = element_blank(),
+        panel.grid.major.y = element_blank(),
+        axis.line.y = element_blank(),
+        axis.line.x = element_blank(),
+        axis.ticks.y = element_blank(),
+        axis.ticks.x = element_blank(),
+        legend.position= c(0.85, 0.94),
+        legend.text = element_text(size = 14),
+        legend.key.size = unit(0.7, "lines"),
+        legend.title = element_blank())
+```
+## Comparision of Galway West to the national average for party share of votes for year 2016/2020
+
+The data for national average for 2016 has been collected from TCD political scientist Michael Gallagher's web site: https://www.tcd.ie/Political_Science/people/michael_gallagher/Election2016.php (2016 data) and https://www.tcd.ie/Political_Science/people/michael_gallagher/Election2020.php (2020 data)
+
+### Analysis of vote differnce between Galway and National year 2020
+
+```{r national 2020}
+#Read the CSV of national averages for 2020
+national_2020 <- read.csv("national-2020-results.csv") %>% select(ï..2020.election.result,Votes,X..vote)
+colnames(national_2020)<-c("party","votes","votes_percent")
+national_2020$votes <- as.numeric(gsub(",", "", national_2020$votes))
+#set region as it will be again used in plot and calculation
+national_2020$region <- "Ireland"
+#remove last few row
+national_2020<-national_2020[c(-20,-21,-22),]
+head(national_2020)
+```
+
+The data scrapped has a number of issues in part names due to encoding difference and needs to be cleaned for better and accurate processing and visualisation
+
+```{r cleaning national 2020}
+national_2020$party[national_2020$party %in% "People Before Profit"] <- "People-Before-Profit"
+national_2020$party[national_2020$party %in% "Green Party"] <- "Green-Party"
+national_2020$party[national_2020$party %in% "Fianna FÃ¡il"] <-  "Fianna-Fail"
+national_2020$party[national_2020$party %in% "Labour"] <- "Labour-Party"
+national_2020$party[national_2020$party %in% "Fine Gael"] <- "Fine-Gael"
+national_2020$party[national_2020$party %in% "Social Democrats"] <- "Social-Democrats"
+national_2020$party[national_2020$party %in%  "Sinn FÃ©in"] <-  "Sinn-Fein"
+national_2020$party[national_2020$party %in% "Solidarityâ\200“PBP (Solidarityâ\200“ People Before Profit Alliance)"]<-"Solidarity–PBP"
+national_2020$party[national_2020$party %in% "AontÃº"] <- "Aontu"
+head(national_2020)
+```
+
+```{r galway 2020}
+# modifying Galway 2020 data for next task
+galway_2020_data<-data_2020_vote %>% select(party,votes,short)
+galway_2020_data$region <- "Galway"
+galway_2020_data$votes_percent <- round(galway_2020_data$votes * 100 / sum(galway_2020_data$votes), 2)
+head(galway_2020_data)
+```
+```{r national 2020}
+# modifying country 2020 data for next task
+ireland_2020_data <- national_2020 %>% select(party,votes,region,votes_percent)
+ireland_2020_data$short <- c("SF","FF","FG","GP","LP","SDP","SPBP","PBP","SP","RISE","AON","I4C","IFP","RI","NP","IDP","WP","UP","IND")
+head(ireland_2020_data)
+```
+
+
+```{r plot national galway 2020}
+combined_2020_ireland_galway_data <- rbind(galway_2020_data,ireland_2020_data)
+
+theme_set(theme_classic())
+
+#plot to show the values of all the data form 2016.2020, national
+compare_national_local_plot<-ggplot(combined_2020_ireland_galway_data , mapping = aes(x = votes_percent, y = short)) +
+  geom_line(aes(group = short), colour = "grey", size = 0.5) +
+  geom_point(aes(colour = region), size = 3, alpha = 0.9) + 
+  #Set the x-axis scale
+  scale_x_continuous(
+    limits = c(0, max(combined_2020_ireland_galway_data$votes_percent)),
+    expand = c(0, 0),
+    breaks = seq(0, max(combined_2020_ireland_galway_data$votes_percent)+3, by = 1),
+    name = "Percentage of votes"
+  ) + ggtitle("Total vote percentage difference year 2020") +
+  #Set the theme
+  theme(
+    axis.title.y = element_blank(),
+    panel.grid.major.x = element_line(size = 0.03),
+    panel.grid.minor.x = element_blank(),
+    panel.grid.major.y = element_blank(),
+    axis.line.y = element_blank(),
+    axis.line.x = element_blank(),
+    axis.ticks.y = element_blank(),
+    axis.ticks.x = element_blank(),
+    legend.position = c(0.90, 0.95),
+    legend.text = element_text(size = 8),
+    legend.key.size = unit(0.7, "lines"),
+    legend.title = element_blank()
+  )
+  
+plot(compare_national_local_plot)
+```
+### Analysis of vote differnce between Galway and National year 2016
+
+```{r national 2016}
+#Read the CSV of national averages for 2016
+national_result_2016 <-read.csv("national-2016-results.csv") %>% select(ï..2016.election.result,Votes,	X..vote)
+colnames(national_result_2016)<-c("party","votes","votes_percent")
+national_result_2016$votes <- as.numeric(gsub(",", "", national_result_2016$votes))
+#set region as it will be again used in plot and calculation
+national_result_2016$region <- "Ireland"
+
+#remove last few row
+national_result_2016<-national_result_2016[c(-22),]
+# Data cleaning 
+national_result_2016$party[national_result_2016$party %in% "Solidarityâ\200“PBP (Solidarityâ\200“ People Before Profit Alliance)"]<-"Solidarity–PBP"
+national_result_2016$party[national_result_2016$party %in% "Fianna FÃ¡il"] <-  "Fianna-Fail"
+national_result_2016$party[national_result_2016$party %in%  "Sinn FÃ©in"] <-  "Sinn-Fein"
+national_result_2016$party[national_result_2016$party %in% "People Before Profit"] <- "People-Before-Profit"
+national_result_2016$party[national_result_2016$party %in% "Green Party"] <- "Green-Party"
+national_result_2016$party[national_result_2016$party %in% "Fine Gael"] <- "Fine-Gael"
+national_result_2016$party[national_result_2016$party %in% "Social Democrats"] <- "Social-Democrats"
+national_result_2016$party[national_result_2016$party %in% "AontÃº"] <- "Aontu"
+national_result_2016$party[national_result_2016$party %in% "Labour"] <- "Labour-Party"
+
+
+head(national_result_2016)
+```
+
+```{r galway 2016}
+# modifying Galway 2016 data for next task
+galway_2016_data<-data_2016_vote %>% select(party,votes,short)
+galway_2016_data$region <- "Galway"
+galway_2016_data$votes_percent <- round(galway_2016_data$votes * 100 / sum(galway_2016_data$votes), 2)
+head(galway_2016_data)
+```
+
+```{r}
+# modifying country 2016 data for next task
+ireland_2016_data <- national_result_2016 %>% select(party,votes,region,votes_percent)
+ireland_2016_data$short <- c("FG","FF","SF","LP","AAA","PBP","SOCP","SD","GP","RI","WUAG","DDI","WP","CD","FN","IDP","CPI","II","IA","I4C","IND")
+ireland_2016_data
+```
+```{r plot galway national 2016}
+combined_2016_ireland_galway_data <- rbind(galway_2016_data,ireland_2016_data)
+theme_set(theme_classic())
+
+#plot to show the values of all the data form 2016.2020, national
+compare_national_local_plot_2016<-ggplot(combined_2016_ireland_galway_data , mapping = aes(x = votes_percent, y = short)) +
+  geom_line(aes(group = short), colour = "grey", size = 0.5) +
+  geom_point(aes(colour = region), size = 3, alpha = 0.9) + 
+  #Set the x-axis scale
+  scale_x_continuous(
+    limits = c(0, max(combined_2020_ireland_galway_data$votes_percent)),
+    expand = c(0, 0),
+    breaks = seq(0, max(combined_2020_ireland_galway_data$votes_percent)+3, by = 1),
+    name = "Percentage of votes"
+  ) + ggtitle("Total vote percentage difference year 2016") +
+  #Set the theme
+  theme(
+    axis.title.y = element_blank(),
+    panel.grid.major.x = element_line(size = 0.03),
+    panel.grid.minor.x = element_blank(),
+    panel.grid.major.y = element_blank(),
+    axis.line.y = element_blank(),
+    axis.line.x = element_blank(),
+    axis.ticks.y = element_blank(),
+    axis.ticks.x = element_blank(),
+    legend.position = c(0.90, 0.95),
+    legend.text = element_text(size = 8),
+    legend.key.size = unit(0.7, "lines"),
+    legend.title = element_blank()
+  )
+  
+plot(compare_national_local_plot_2016)
+```
+
+## Change in vote for candidate in both election of Galway West
+
+We will try to find which candidates were impacted most during both the elections of Galway West 2016 and 2020
+```{r change candidate 2016 2020}
+
+# We will read 2016 and 2020 data again for Galway
+
+# 2016 galway data
+data_cand_2016 <- read.csv("2016-04-28_general-election-count-details-galway-west-csv_en.csv",col.names =c("consitituency_name","candidate_surname","candidate_first_name","result","count_number","transfers","votes","total_votes","candidate_id","party"))
+
+# read rows with count number as 1 as they are the only votes that matter
+data_cand_2016 <- data_cand_2016 %>% filter(count_number==1) 
+
+# Candidate name = first name + last name
+data_cand_2016$candidate_name <- paste(data_cand_2016$candidate_first_name," ",data_cand_2016$candidate_surname)
+
+# ignore irrelvant columns
+data_cand_2016 <- data_cand_2016 %>% select(total_votes,party,candidate_name)
+
+# reference : https://stackoverflow.com/questions/1660124/how-to-sum-a-variable-by-group
+data_cand_2016 <- aggregate(data_cand_2016$total_votes, by=list(Category=data_cand_2016$candidate_name,data_cand_2016$party), FUN=sum)
+
+data_cand_2016 <- data_cand_2016 %>% rename(Candidate=Category,party=Group.2,votes=x)
+data_cand_2016$year <-2016
+# head shows the first few rows of the data
+head(data_cand_2016)
+
+
+
+data_cand_2020 <- read_excel("GalwayWest-2020.xlsx",col_names=c("dummy","party","candidate_name","fpv","c1","c2","c3","c4","c5","c6","c7","c8","c9","c10","c11","c12","c13"))
+
+# the first column  and first two rows are of no use so we will drop it
+data_cand_2020$dummy <-NULL
+data_cand_2020 = data_cand_2020[-1,]
+data_cand_2020 = data_cand_2020[-1,]
+
+data_cand_2020 <- data_cand_2020  %>% select(party,c1,candidate_name)
+# converting c1 datatype to numeric for calculation
+data_cand_2020$c1 <- as.numeric(as.character(data_cand_2020$c1))
+
+# Remove last row with NA Reference: https://stat.ethz.ch/pipermail/r-help/2012-December/343413.html
+data_cand_2020<- data_cand_2020[-nrow(data_cand_2020),] 
+
+data_cand_2020 <- aggregate(data_cand_2020$c1, by=list(Category=data_cand_2020$candidate_name,data_cand_2020$party), FUN=sum)
+data_cand_2020<- data_cand_2020 %>% rename(Candidate=Category,party=Group.2,votes=x)
+data_cand_2020$year <-2020
+# head shows the first few rows of the data
+head(data_cand_2020)
+
+```
+```{r combine 2016 2020 galway candidate data}
+
+#data_cand_2016_2020 <- rbind(data_cand_2016, data_cand_2020)
+data_cand_2016$candidate_short <- c("TH","RON","AOC","JC","MH","HN","JOM","SK","SS","CMAC","FHE","MC","NG","PF","TR","DN","JC","ND","TC","NOT")
+data_cand_2020$candidate_short <- c("COC","EOC","OC","HN","SK","POR","CMAC","DOF","MC","NG","NMN","MF","NOT","CB","JL")
+
+data_cand_2016_2020 <- merge(data_cand_2016,data_cand_2020,by="candidate_short")
+data_cand_2016_2020 <- data_cand_2016_2020 %>% select(candidate_short,Candidate.x,votes.x,party.y,votes.y)
+colnames(data_cand_2016_2020)<- c("candidate_short","candidate_name","vote_2016","party","vote_2020")
+# reference : https://stackoverflow.com/questions/19838860/to-find-the-difference-between-two-column-elements-in-a-data-frame/19838952
+data_cand_2016_2020$diff_vote <- data_cand_2016_2020$vote_2020 - data_cand_2016_2020$vote_2016
+data_cand_2016_2020$pos <- factor(ifelse(data_cand_2016_2020$diff_vote >= 0, "TRUE", "FALSE"), levels = c("TRUE", "FALSE"))
+data_cand_2016_2020
+```
+
+```{r plot candidate 2016 2020 galway}
+# As color is a secondary aesthetic in this case i have used a combination of green and red which is in general highly discouraged as it creates problem for color blind audience
+cb2 <- c("#0F9D00","#C50101") # created using https://color.adobe.com/create/color-wheel
+ggplot(data_cand_2016_2020, aes(x = candidate_name, y = diff_vote,fill=pos)) + 
+  geom_col(position = "identity", alpha = 0.85, width=0.7) +
+  
+  scale_y_continuous(limits = c(-1000, 1100),
+                     breaks = seq(-1000, 1500, by= 200) ,
+                     name = "Difference in Vote from 2016 to 2020",
+                     expand=c(0,0),
+                     labels = scales::number_format(accuracy = 0.1)) + scale_fill_manual(values=cb2) +
+    theme(
+      axis.line.y = element_blank(),
+      axis.ticks.y = element_blank(),
+      axis.line.x = element_blank(),
+      #axis.ticks.x = element_blank(),
+      axis.text.x = element_text(angle = 25, vjust = 1, hjust = 1),
+      axis.title.x = element_blank(),
+      plot.margin = margin(6, 6, 3, 3),
+     panel.background=element_blank(),
+      panel.grid.major.y = element_line(size = 0.2, linetype = 'solid',colour = "white"),
+      panel.ontop = TRUE,
+      legend.position = "none"
+    )
+
+```
+### Few References:
+
+1. https://clayford.github.io/dwir/dwr_05_combine_merge_rehsape_data.html
+2. https://www.tcd.ie/Political_Science/people/michael_gallagher/Election2016.php
+3. https://www.tcd.ie/Political_Science/people/michael_gallagher/Election2020.php
+4. https://uc-r.github.io/tidyr#gather
+5. GGPlot Notes 
+6. https://color.adobe.com/create/color-wheel
+7. https://github.com/clauswilke/colorblindr
+8. https://blog.datawrapper.de/partycolors/
