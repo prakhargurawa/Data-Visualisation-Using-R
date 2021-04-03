@@ -1,0 +1,21 @@
+age,ceremonies,bride_groom
+< 20,83,Groom
+20 - 24,315,Groom
+25 - 29,2992,Groom
+30 - 34,7798,Groom
+35 - 39,4563,Groom
+40 - 44,2048,Groom
+45 - 49,1064,Groom
+50 - 54,594,Groom
+55 - 59,415,Groom
+>= 60,517,Groom
+< 20,147,Bride
+20 - 24,515,Bride
+25 - 29,4615,Bride
+30 - 34,8062,Bride
+35 - 39,3773,Bride
+40 - 44,1447,Bride
+45 - 49,836,Bride
+50 - 54,480,Bride
+55 - 59,271,Bride
+>= 60,243,Bride

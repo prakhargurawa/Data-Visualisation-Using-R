@@ -1,0 +1,746 @@
+---
+title: "Visualising Amounts"
+output:
+  word_document: default
+  html_document:
+    df_print: paged
+always_allow_html: true
+---
+
+We will look at how to represent variation with category values with the following charts
+
+Bar charts
+Diverging Bar charts
+Cleveland Dot plots
+Lollipop plots
+Pareto Charts
+ 
+### Bar Plots
+
+Dataset : https://scannain.com/Irish-box-office-top-ten/ (Irish Box Office Top 10, Weekend: October 25th to 27th, 2019)
+
+```{r}
+ire_box_office <- read.csv("ire-movie-october25-2019.csv")
+
+# quick disoplay of variable abd variable types
+str(ire_box_office)
+```
+We’ll put this data into tabular form first. I want to show the following fields: rank, film title, weekend gross (in euro). The easiest way to create a formatted euro amount is to use the dollar_format function using the scales library. Yes, dollar_format to create a euro symbol!
+
+Using, an adaption of this function to insert the euro sign, I create another column in the data weekend_euro
+```{r}
+library(scales)
+ire_box_office$weekend_euro <- dollar_format(prefix = "\u20ac", big.mark = ",") (ire_box_office$weekend_gross)
+```
+I will use the kable library to format the table. First, Using dplyr I select the columns I want to show into a new data_frame.
+```{r}
+library(dplyr)
+
+boxoffice_ire_display <- ire_box_office %>%
+  select(ï..rank, title, weekend_euro,) %>%
+  rename(Rank = ï..rank,
+         Title = title,
+         `Weekend gross` = weekend_euro)
+```
+I use the kableExtra library to create a nice looking table. There is a good tutorial [here] (https://cran.r-project.org/web/packages/kableExtra/vignettes/awesome_table_in_html.html) on using Kable and kableExtra. It contains the word ‘awesome’ in its title so you know it must be good.
+```{r}
+library(knitr)
+library(kableExtra)
+
+
+boxoffice_ire_display%>%
+  kable(align = c('c',  'l', 'c'), caption = 'Highest grossing movies in Ireland for the weekend of October 25-27, 2019. Data source: Scannain.ie') %>%
+  kable_styling(bootstrap_options = c("striped", "hover", "condensed"), full_width = F)
+```
+Data where we have ranked amounts is commonly visualized with vertical bars of different lengths. For each movie, we draw a bar that starts at zero and extends all the way to the value we wish to represent. This type of visualization is called a bar plot or bar chart.
+
+In ggpolot terms, the aesthetic that is used is the length of a column.As such the geometric we use is geom_col.
+
+You can create a basic bar plot here using the first 3 layers of grammar of graphics. As you can see, there is still some work to do before this plot is presentable. We will now step through what is required
+
+I have used the theme_set function to set the overall theme to be theme_classic. I could have done this by simply adding + theme_classic() to the plot. This clears away all default gridlines, gives white background to the plot.
+
+It makes sense to have some gridlines to help establish the values associated with each bar. I just use the major gridlines for the y axis, which can be defined by the panel.grid.major.y parameter within the theme function.
+
+I’d like to be able to see the gridlines behind each bar - for the sake of visual continuity. I set the alpha value of the geom_col geometric to be 0.8. As you may recall, the alpha value defines the transparency of a visual object.
+```{r}
+library(ggplot2)
+
+theme_set(theme_classic())
+
+ggplot(ire_box_office, (aes(x= title_short, y=weekend_gross))) + 
+  geom_col(alpha=0.85) +
+  theme(panel.grid.major.y = element_line(size = 0.2, linetype = 'solid',colour = "lightgrey") )
+```
+
+### Ordering the bars
+
+We generally want to order the bars by their value on the y-axis.
+
+We use the reorder function to reorder the bars by their euro value rather than by the default alphabetical ordering which is used by R to order a factor. An alternative approach would be to explicitly set the order of the levels in the factor; In this case, we would set the order of film titles in the title_short factor.
+
+The reorder function sorts in ascending order by default. To sort in descending order, just make the make the variable you wish to order negative
+
+
+
+```{r}
+library(ggplot2)
+
+theme_set(theme_classic())
+
+ggplot(ire_box_office, (aes(x= reorder(title_short, -weekend_gross) , y=weekend_gross))) + 
+ geom_col(alpha=0.85) +
+  theme(panel.grid.major.y = element_line(size = 0.2, linetype = 'solid',colour = "lightgrey") )
+```
+
+One problem we commonly encounter with vertical bars is that the labels identifying each bar take up a lot of horizontal space. To save horizontal space, we could place the bars closer together and rotate the labels.
+
+This is non-data related adjustment and we do this in the theme function by setting the angle and vjust and hjust values of the axis.text.x parameter.
+
+Note that I have removed the x-axis title and the axis line on both the x and y axes. Again, this was done in the theme function. Setting the value of any parameter in the theme function to element_blank will make the corresponding visual feature disappear.
+
+The width parameter in the geom_col function allows you to specify the bar width - and in this case, I have set the width to 0.7 of the default. Try changing it to see the effect it has.
+
+```{r}
+library(ggplot2)
+
+theme_set(theme_classic())
+
+ggplot(ire_box_office, (aes(x= reorder(title_short, -weekend_gross) , y=weekend_gross))) + 
+  geom_col(alpha=0.85, width = 0.7) +
+    theme(
+      axis.line.y = element_blank(),
+      axis.ticks.y = element_blank(),
+      axis.line.x = element_blank(),
+      axis.ticks.x = element_blank(),
+      axis.text.x = element_text(angle = 45, vjust = 1, hjust = 1),
+      axis.title.x = element_blank(),
+      plot.margin = margin(3, 6, 3, 3),
+      panel.grid.major.y = element_line(size = 0.2, linetype = 'solid',colour = "lightgrey")
+      
+    )
+```
+
+We still need to adjust the y-axis. The scale uses scientific notation, which in this case is not appropriate. It also has a title that needs reformatting. We can solve these issues by customising the x-axis scale. The function to use for this is scale_x_continuous.
+
+Within this function, I specify the axis breaks I want displayed with a vector of evenly spaced values. I also specify how I want these values to be labelled. This overrides the default breaks and labels imposed by ggplot.
+
+Often an axis becomes crowded and ugly with large numbers, hence the use of the more compact scientific notation. When you don’t want to use this type of notation, you can specify the axis units to be in millions or thousands as I do here. I also specify the name or label I want for the y axis.
+
+In this plot, I use a suggestion on bar plots from Edward Tufte - made in the spirit of reducing ink. I’ve made the gridlines white. Now gridlines are part of the overall background panel in a ggplot. If I bring the overall panel to the fore using panel.ontop = TRUE in the theme function, the background panel also comes to the fore and obscures the plot. To deal with this issue, you set panel.background to be blank.
+
+Using white gridlines eliminates the gridlines on the plot that do not intersect with the bars, and removes the ticks. It also has the effect of breaking bars into visible units based on the break intervals. This allows for visual quantification of the difference between bars. For example it’s easy to see that the lowest ranking films are less all less than one unit high (< 50k), and that Maleficient and Terminator are both just over 3 units high (> 150k )
+
+```{r}
+library(ggplot2)
+
+theme_set(theme_classic())
+
+ggplot(ire_box_office, (aes(x= reorder(title_short, -weekend_gross) , y=weekend_gross))) + 
+  geom_col( width=0.7) +
+  
+  scale_y_continuous(limits = c(0, 3.8e5),
+                     
+                     breaks = c( 5e4,  1.0e5,  1.5e5, 2.0e5, 2.5e5,3e5,3.5e5 ),
+                     labels = c("50", "100", "150", "200","250", "300", "350" ),
+                     name = "weekend gross (x €1,000)") +
+  
+  ggtitle("weekend gross (x €1,000) - Oct 25-27 2019 ") +
+  
+    theme(
+      axis.title.y = element_blank(),
+      axis.line.y = element_blank(),
+      axis.ticks.y = element_blank(),
+      axis.line.x = element_blank(),
+      axis.ticks.x = element_blank(),
+      axis.text.x = element_text(angle = 45, vjust = 1, hjust = 1),
+      axis.title.x = element_blank(),
+      plot.title = element_text(vjust = -10, hjust = 0.25, size = 11),
+      plot.margin = margin(6, 6, 3, 3),
+      panel.background = element_blank(),
+      panel.grid.major.y = element_line(size = 0.4, linetype = 'solid',colour = "white"),
+      panel.ontop = TRUE
+      
+    )
+```
+The gridlines or (‘Tufte’ lines that are drawn here) help in guiding your eye to the from the top of each bar to the corresponding horizontal location on the y axis. As presented, the plot gives us the ranking of the movies and an approximation of the gross revenues each generated. We also get a sense of the comparative differences in revenue for these movies.
+
+If we really needed more precision in presenting the actual revenue values per movie, we could insert the value over the bar and drop the y-axis and gridlines entirely. However, the visualisation does lose something in terms of being able to see at a glance the comparative difference in revenue values per movie.
+
+We use the geom_text geometric to realise this. This demonstrates that an additional geom level aesthetic mapping is also possible. Here we specify that the label property of geom_text is to be associated with the value of weekend_euro, the variable I created earlier to hold formatted euro values of the weekend_gross values in the dataset. The geom_text elements will be placed at the x, y locations specified by the plot level aesthetic mapping, and the value of each geom_text point will be taken from weekend_euro.
+
+I specify the size of the text and make a slight vertical adjustment with vjust so that the text hovers over the bar instead of just inside it.
+
+To remove the y-axis, I have removed the scale_y_continuous function and in the theme function, I have set axis.title.y and axis.text.y to element_blank.
+
+I have added a title using ggtitle and moved it with the plot area, using the plot.title parameter in theme so as to make clear what the numbers represent.
+
+```{r}
+library(ggplot2)
+
+theme_set(theme_classic())
+
+ggplot(ire_box_office, (aes(x= reorder(title_short, -weekend_gross) , y=weekend_gross))) + 
+  geom_col(width=0.7) +
+  geom_text(aes(label=weekend_euro), size =2.5, vjust=-0.4) +
+  ggtitle("weekend gross - Oct 25-27 2019 ") +
+  
+    theme(
+      axis.title.y = element_blank(),
+      axis.text.y = element_blank(),
+      axis.line.y = element_blank(),
+      axis.ticks.y = element_blank(),
+      axis.line.x = element_blank(),
+      axis.ticks.x = element_blank(),
+      axis.text.x = element_text(angle = 45, vjust = 1, hjust = 1),
+      axis.title.x = element_blank(),
+      plot.margin = margin(6, 6, 3, 3),
+      plot.title = element_text(vjust = -10, hjust = 0.2, size = 11)
+      
+    )
+```
+While the film titles are now readable, there is a disadvantage in that the plot is vertically longer than it needs to be, and the reader has to slightly tilt their reading angle to read the titles on the x-axis.
+
+An alternative is to swap the x and the y axis, so that the bars run horizontally. This is often done where there are more than, say, 6 categories to visualise.
+
+Adding The coord_flip function will swap the axes. As the film titles are now on the y axis and the revenue values are on the x axis, I have to also reinstate the x-axis title and remove the y -axis title.
+
+I’ve put in gridlines - this time, major gridlines for the x axis. This is done within the theme function by specifying values for the panel.grid.major.x parameter.
+
+
+```{r}
+library(ggplot2)
+
+theme_set(theme_classic())
+
+ggplot(ire_box_office, (aes(x= reorder(title_short, weekend_gross) , y=weekend_gross))) + 
+  geom_col( width=0.8) +
+  scale_y_continuous(limits = c(0, 3.8e5),
+                     expand = c(0, 0),
+                     breaks = c( 5e4,  1.0e5,  1.5e5, 2.0e5, 2.5e5,3e5,3.5e5 ),
+                     labels = c("50", "100", "150", "200","250", "300", "350" ),
+                     name = "weekend gross (x €1,000)") +
+  
+  ggtitle("weekend gross (x €1,000) - Oct 25-27 2019 ") +
+
+  coord_flip(clip = "off") +
+    theme(
+      axis.title = element_blank(),
+      axis.line.y = element_blank(),
+      axis.ticks.y = element_blank(),
+      axis.line.x = element_blank(),
+      axis.ticks.x = element_blank(),
+      axis.title.y = element_blank(),
+      plot.title = element_text(size = 11),
+      plot.margin = margin(3, 6, 3, 3),
+      panel.background = element_blank(),
+      panel.grid.major.x = element_line(size = 0.4, linetype = 'solid',colour = "white"),
+      panel.ontop = TRUE
+    
+    )
+```
+It could be argued that without the visible gridline that the scale on the axis might be hard to reconcile to the white break lines in the bars. An approach to address this is to put the x-axis at the top of the figure. Now this is not commonly done - and it is not completely straightforward to do this in ggplot either. However with ordered bars and the invisible ‘Tufte’ gridlines, I think it is permissible.
+
+To accomplish this ggplot, I specify the axis as a duplicate axis sec.axis = dup_axis(). As the name suggests, this creates a second duplicate axis (on top). In the theme function, I remove the axis from the bottom of the plot by setting the axis.title.x.bottom and axis.text.x.bottom attributes to element_blank()
+
+```{r}
+library(ggplot2)
+
+theme_set(theme_classic())
+
+ggplot(ire_box_office, (aes(x= reorder(title_short, weekend_gross) , y=weekend_gross))) + 
+  geom_col( width=0.8) +
+  
+  
+  scale_y_continuous(sec.axis = dup_axis(), limits = c(0, 3.8e5),
+                     expand = c(0, 0),
+                      breaks = c( 5e4,  1.0e5,  1.5e5, 2.0e5, 2.5e5,3e5,3.5e5 ),
+                     labels = c("50", "100", "150", "200","250", "300", "350" ),
+                     name = "weekend gross (x €1,000)") +
+  ggtitle("weekend gross (x €1,000) - Oct 25-27 2019 ") +
+
+  coord_flip(clip = "off") +
+    theme(
+      axis.title = element_blank(),
+      axis.line.y = element_blank(),
+      axis.ticks.y = element_blank(),
+      axis.line.x = element_blank(),
+      axis.ticks.x = element_blank(),
+      axis.title.y = element_blank(),
+      axis.title.x.bottom =  element_blank(),
+      axis.text.x.bottom =  element_blank(),
+     plot.title = element_text(size = 11),
+      plot.margin = margin(3, 6, 3, 3),
+      panel.background = element_blank(),
+      panel.grid.major.x = element_line(size = 0.4, linetype = 'solid',colour = "white"),
+      panel.ontop = TRUE)
+```
+After swapping the axes, we obtain a compact figure in which all visual elements, including all text, are horizontally oriented. As a result, the figure is much easier to read.
+
+By default, bar graphs use dark grey bars. However we can customise the colour fill of the bars using the fill property
+
+```{r}
+library(ggplot2)
+
+theme_set(theme_classic())
+
+ggplot(ire_box_office, (aes(x= reorder(title_short, weekend_gross) , y=weekend_gross))) + 
+  geom_col( fill="#5069be", width=0.8) +
+  
+  
+  scale_y_continuous(sec.axis = dup_axis(), limits = c(0, 3.8e5),
+                     expand = c(0, 0),
+                      breaks = c( 5e4,  1.0e5,  1.5e5, 2.0e5, 2.5e5,3e5,3.5e5 ),
+                     labels = c("50", "100", "150", "200","250", "300", "350" ),
+                     name = "weekend gross (x €1,000)") +
+  ggtitle("weekend gross (x €1,000) - Oct 25-27 2019 ") +
+
+  coord_flip(clip = "off") +
+    theme(
+      axis.title = element_blank(),
+      axis.line.y = element_blank(),
+      axis.ticks.y = element_blank(),
+      axis.line.x = element_blank(),
+      axis.ticks.x = element_blank(),
+      axis.title.y = element_blank(),
+      axis.title.x.bottom =  element_blank(),
+      axis.text.x.bottom =  element_blank(),
+     plot.title = element_text(size = 11),
+      plot.margin = margin(3, 6, 3, 3),
+      panel.background = element_blank(),
+      panel.grid.major.x = element_line(size = 0.4, linetype = 'solid',colour = "white"),
+      panel.ontop = TRUE)
+```
+And here is the same plot with the x-axis on the bottom and standard grey gridlines
+
+```{r}
+library(ggplot2)
+
+theme_set(theme_classic())
+
+ggplot(ire_box_office, (aes(x= reorder(title_short, weekend_gross) , y=weekend_gross))) + 
+  geom_col(alpha=0.8, fill="#5069be", width=0.8) +
+  
+  
+  scale_y_continuous(limits = c(0, 3.8e5),
+                     expand = c(0, 0),
+                      breaks = c( 5e4,  1.0e5,  1.5e5, 2.0e5, 2.5e5,3e5,3.5e5 ),
+                     labels = c("50", "100", "150", "200","250", "300", "350" ),
+                     name = "weekend gross (x €1,000)") +
+  ggtitle("weekend gross (x €1,000) - Oct 25-27 2019 ") +
+
+  coord_flip(clip = "off") +
+    theme(
+      axis.title = element_blank(),
+      axis.line.y = element_blank(),
+      axis.ticks.y = element_blank(),
+      axis.line.x = element_blank(),
+      axis.ticks.x = element_blank(),
+      axis.title.y = element_blank(),
+     plot.title = element_text(size = 11),
+      plot.margin = margin(3, 6, 3, 3),
+      panel.grid.major.x = element_line(size = 0.2, linetype = 'solid',colour = "lightgrey"))
+```
+Here it is with the title removed and the axis title reinstated.
+
+```{r}
+library(ggplot2)
+
+theme_set(theme_classic())
+
+ggplot(ire_box_office, (aes(x= reorder(title_short, weekend_gross) , y=weekend_gross))) + 
+  geom_col(fill="#5069be",alpha = 0.85, width=0.8) +
+  scale_y_continuous(limits = c(0, 3.8e5),
+                     expand = c(0, 0),
+                      breaks = c( 5e4,  1.0e5,  1.5e5, 2.0e5, 2.5e5,3e5,3.5e5 ),
+                     labels = c("50", "100", "150", "200","250", "300", "350" ),
+                     name = "weekend gross (x €1,000)")  +
+  coord_flip(clip = "off") +
+    theme(
+      axis.line.y = element_blank(),
+      axis.ticks.y = element_blank(),
+      axis.line.x = element_blank(),
+      axis.ticks.x = element_blank(),
+      axis.title.y = element_blank(),
+      plot.margin = margin(3, 6, 3, 3),
+      panel.grid.major.x = element_line(size = 0.2, linetype = 'solid',colour = "lightgrey")
+      
+    )
+```
+
+## Different orderings
+In the previous example, we reordered the bars. We should only do this when there is no natural ordering to the categories the bars represent. Whenever there is a natural ordering (i.e. when our categorical variable is an ordered factor) we should retain that ordering in the visualization.
+
+For example, this figure shows the age profiles of grooms in registered marriages in Ireland in 2018, ordered by age groups. In this case, the bars should be arranged in order of increasing age. Sorting by bar height while shuffling the age groups makes no sense. The data for this plot was obtained from the [Central Statistics Office]
+
+(https://statbank.cso.ie/px/pxeirestat/statire/SelectTable/Omrade0.asp?Planguage=0)
+
+```{r}
+bride_groom_age <- read.csv("ire_2018_bride_groom_age.csv")
+
+library(ggplot2)
+library (dplyr)
+
+bride_groom_age$age <- factor(bride_groom_age$age, levels = c("< 20", "20 - 24", "25 - 29", "30 - 34", "35 - 39", "40 - 44","45 - 49", "50 - 54", "55 - 59",">= 60" ))
+
+bride_groom_age_g<-bride_groom_age%>%filter(bride_groom=="Groom")
+
+theme_set(theme_classic())
+
+ggplot(bride_groom_age_g, (aes(x= age, y=ceremonies))) + 
+ geom_col(fill="#66c2a5", alpha=0.85, width =0.8) +
+  scale_y_continuous(
+    breaks = c(0, 1000, 2000, 3000, 4000, 5000, 6000, 7000),
+    expand = c(0, 0),
+    name = "number of marriage ceremonies") +
+  xlab(label = "age (years)") +
+  
+    theme(
+      axis.line.y = element_blank(),
+      axis.ticks.y = element_blank(),
+      axis.line.x = element_blank(),
+      axis.ticks.x = element_blank(),
+    panel.grid.major.y = element_line(size = 0.2, linetype = 'solid',colour = "lightgrey") )
+```
+
+Here is the same data plotted using the ‘Tufte’ gridlines approach.
+
+```{r}
+library(ggplot2)
+
+theme_set(theme_classic())
+
+ggplot(bride_groom_age_g, (aes(x= age, y=ceremonies))) + 
+ geom_col(fill="#66c2a5", width =0.8) +
+  scale_y_continuous(
+    breaks = c(0, 1000, 2000, 3000, 4000, 5000, 6000, 7000),
+    expand = c(0, 0),
+    name = "number of marriage ceremonies") +
+  xlab(label = "age (years)") +
+  
+    theme(
+      axis.line.y = element_blank(),
+      axis.ticks.y = element_blank(),
+      axis.line.x = element_blank(),
+      axis.ticks.x = element_blank(),
+      panel.background = element_blank(),
+    panel.grid.major.y = element_line(size = 0.4, linetype = 'solid', colour = "white"),
+     panel.ontop = TRUE) 
+```
+## Grouped and Stacked bars
+
+Frequently, however, we are interested in two categorical variables at the same time. In a grouped bar plot, we draw a group of bars at each position along the x axis, determined by one categorical variable, and then we draw bars within each group according to the other categorical variable.
+
+In the next plot, we will include the age profile of the brides in registered marriage ceremonies in Ireland.
+
+We use colour fill as an aesthetic so that bars representing groom data will be one colour and bars representing bride data will be another. In the aes function we set fill = bride_groom, the variable designating whether a data point is for bride or groom.
+
+You must use the position = “dodge” in the geom_col function, which tells the bars to avoid each other horizontally.
+
+Check to what happens when you don’t use position = “dodge”
+
+The default ggplot colours aren’t great. We can use the scale_fill_manual function to set our own pair of colour values, which are a pair of colour-blind friendly qualitative colours selected from the http://colorbrewer2.org website. I have set name = NULL in this function to tell ggplot not to render the name of the legend, which is often not required.
+
+In order to reduce the width of the overall plot, I have moved the legend inside the plot from its default position on the right hand-side outside the plot. It is OK to do this, as long as the legend cannot be confused with or interfere with the perception of the data elements of the plot.
+
+```{r}
+library(ggplot2)
+library (dplyr)
+
+
+theme_set(theme_classic())
+
+ggplot(bride_groom_age, (aes(x= age, y=ceremonies, fill=bride_groom))) + 
+ geom_col(position="dodge", alpha=0.85) +
+  scale_y_continuous(
+    breaks = c(0, 1000, 2000, 3000, 4000, 5000, 6000, 7000),
+    expand = c(0, 0),
+    name = "number of marriage ceremonies") +
+  xlab(label = "age (years)") +
+  scale_fill_manual(values = c("#fc8d62","#66c2a5" ), name = NULL) +
+  
+    theme(
+      axis.line.y = element_blank(),
+      axis.ticks.y = element_blank(),
+      axis.line.x = element_blank(),
+      axis.ticks.x = element_blank(),
+   panel.background = element_blank(),
+    panel.grid.major.y = element_line(size = 0.4, linetype = 'solid', colour = "white"),
+     panel.ontop = TRUE,
+    legend.position= c(0.8, 0.9), legend.direction="horizontal") 
+```
+
+Here is another example, but this time with multiple bars. The data is from the Central Statistics Office and gives the distribution of principle economic status values per quarter in 2016.
+
+By running the head function you can see that the data is in wide form, with Q1, Q2 etc represented as columns. ggplot tends to work best with data in long form, so we have to transform the dataframe.
+
+Luckily, there is a tidyverse library called tidyr that allows us to do this easily using the gather function. Using this function, I create two new columns quarter and value, which will represent the transformed data in the new dataframe. You can run head on the new dataframe to see the transformation.
+
+There is a nice explanation on tidyr here
+
+I have used colours from the colourblind friendly palette of Okabe and Ito for this visualisation, but I have desaturated them a little as they were a little bright for my taste.
+
+Note that this is an example where you have to choose your break intervals sensitively. Five out six bars have values below 500 and one bar has a value over 1750. If your break frequency is too great, the gridlines make the overall plot look too busy; At the same time, if your breaks are too far apart, say at levels 1000 and 2000, then it will be difficult to resolve values for the shorter bars against the axis.
+
+As before, in order to reduce the width of the overall plot, I have moved the legend inside the plot from its default position on the right hand-side outside the plot.
+
+```{r}
+library(ggplot2)
+library (dplyr)
+library(tidyr)
+library(colorspace)
+
+econ_stat_per_q <- read.csv("2016PrincipalEconomicStatusPerQuarter.csv")
+
+head(econ_stat_per_q)
+```
+
+```{r}
+# convert the data from wide from to long form, which is required by ggplot
+econ_stat_per_q %>% gather(quarter, value, Q1.2016:Q4.2016)->econ_stat_per_q_long
+
+head(econ_stat_per_q_long)
+```
+
+```{r}
+theme_set(theme_classic())
+
+# colour blind friendly palette - slightly desaturated
+cbPalette <- desaturate(c("#999999", "#E69F00", "#56B4E9", "#009E73", "#F0E442", "#0072B2", "#D55E00", "#CC79A7"), 0.25)
+
+ggplot(econ_stat_per_q_long, (aes(x= quarter, y=value, fill=status))) + 
+ geom_col(position="dodge", alpha=0.85) +
+  scale_y_continuous(
+    breaks = c(0, 250, 500, 750, 1000, 1250, 1500, 1750, 2000),
+    expand = c(0, 0),
+    name = "person aged 15 years and over (Thousand)") +
+  xlab(label = "Year : 2016") +
+scale_fill_manual(values = cbPalette[2:8], name = NULL, labels = c("At work","Home duties","Other","Retired","Student","Unemployed")) +
+  scale_x_discrete(labels = c("Q1","Q2","Q3","Q4"))+
+  
+    theme(
+      axis.line.y = element_blank(),
+      axis.ticks.y = element_blank(),
+      axis.line.x = element_blank(),
+      axis.ticks.x = element_blank(),
+      axis.title = element_text(size=9),
+    panel.grid.major.y = element_line(size = 0.2, linetype = 'solid',colour = "lightgrey"),
+    
+    legend.position= c(0.92, 0.82),
+    legend.text = element_text(size = 6), # legend text  was a little large
+    legend.key.size = unit(0.7, "lines"), # legend key size was a little large
+    legend.title = element_text(size =10)) 
+```
+I have produced a Tufte version of the same plot, which I think works.
+
+```{r}
+library(ggplot2)
+library (dplyr)
+library(tidyr)
+library(colorspace)
+
+theme_set(theme_classic())
+
+# colour blind friendly palette - slightly desaturated
+cbPalette <- desaturate(c("#999999", "#E69F00", "#56B4E9", "#009E73", "#F0E442", "#0072B2", "#D55E00", "#CC79A7"), 0.25)
+
+ggplot(econ_stat_per_q_long, (aes(x= quarter, y=value, fill=status))) + 
+ geom_col(position="dodge") +
+  scale_y_continuous(
+    breaks = c(0, 250, 500, 750, 1000, 1250, 1500, 1750, 2000),
+    expand = c(0, 0),
+    name = "person aged 15 years and over (Thousand)") +
+  xlab(label = "Year : 2016") +
+scale_fill_manual(values = cbPalette[2:8], name = NULL, labels = c("At work","Home duties","Other","Retired","Student","Unemployed")) +
+  scale_x_discrete(labels = c("Q1","Q2","Q3","Q4"))+
+  
+    theme(
+      axis.line.y = element_blank(),
+      axis.ticks.y = element_blank(),
+      axis.line.x = element_blank(),
+      axis.ticks.x = element_blank(),
+      axis.title = element_text(size=9),
+      panel.background=element_blank(),
+      panel.grid.major.y = element_line(size = 0.4, linetype = 'solid',colour = "white"),
+      panel.ontop = TRUE,
+      legend.position= c(0.92, 0.82),
+      legend.text = element_text(size = 6), # legend text  was a little large
+      legend.key.size = unit(0.7, "lines"), # legend key size was a little large
+      legend.title = element_text(size =10))# legend title  was a little large)
+```
+Grouped bar plots show a lot of information at once and they can be confusing. It is a little difficult is difficult to compare numbers of persons across quarters, although admittedly the numbers are relatively static.
+
+If we care more about the overall pattern per economic status group over a given time span, we can group the bars by quarter, clearly showing the change in each group per quarter.
+
+As such, the next plot provides an alternative bar grouping of the same data, where the reader is assumed to be more interested in comparing the quarterly differences within each socio-economic class
+
+
+```{r}
+library(ggplot2)
+library (dplyr)
+library(tidyr)
+library(colorspace)
+
+theme_set(theme_classic())
+
+# colour blind friendly palette - slightly desaturated
+cbPalette <- desaturate(c("#999999", "#E69F00", "#56B4E9", "#009E73", "#F0E442", "#0072B2", "#D55E00", "#CC79A7"), 0.25) 
+
+ggplot(econ_stat_per_q_long, (aes(x= status, y=value, fill=quarter))) + 
+ geom_col(position="dodge") +
+  scale_y_continuous(
+    breaks = c(0, 250, 500, 750, 1000, 1250, 1500, 1750, 2000),
+    expand = c(0, 0),
+    name = "person aged 15 years and over (Thousand)") +
+scale_fill_manual(values = cbPalette[2:8], name = "Year : 2016", labels = c("Q1","Q2","Q3","Q4")) +
+  scale_x_discrete(labels = c("At work","Home duties","Other","Retired","Student","Unemployed"))+
+  
+    theme(
+      axis.line.y = element_blank(),
+      axis.ticks.y = element_blank(),
+      axis.line.x = element_blank(),
+      axis.ticks.x = element_blank(),
+      axis.title.x = element_blank(),
+      axis.title.y = element_text(size = 9),
+      panel.background=element_blank(),
+      panel.grid.major.y = element_line(size = 0.4, linetype = 'solid',colour = "white"),
+      panel.ontop = TRUE,
+      legend.position= c(0.92, 0.82),
+      legend.text = element_text(size = 6), # legend text  was a little large
+      legend.key.size = unit(0.7, "lines"), # legend key size was a little large
+      legend.title = element_text(size =10))# legend title  was a little large) 
+```
+
+The plot below provides an extended view of the data in the figure above. It provides an average Principal Economic Status figure for each group per year. The average is calculated from the quarterly figures per year.
+
+As the bars within each group are ordered (by year), I want colour to indicate some progression in time.
+
+As such I considered using a sequential palette (e.g. from light blue to dark blue). However, as we have 6 years to colour, I found the lightest colour in the sequence was too light. I decided to use the viridis palette as even the palette for the discrete scale suggests a sequence. This palette also has the added bonus of being colour blind friendly.
+
+In the code below, I once again transform the data from wide form| to long form.
+
+In the previous plot, you may have noticed that the ordering of the values of the status factor is alphabetical - At work, Home Duties, Other, etc. Having the value Other in the middle of the more meaningful values is a bit counter-intuitive. It would typically be the last category anyone might be interested in. Although the status variable is an unordered factor, we can impose a specific ordering on it that reflects the interest of our readers. I do this by explicitly resetting the ordering of the levels of the status factor in the dataframe.
+
+
+
+```{r}
+library(RColorBrewer)
+
+econ_stat <- read.csv("2012-2017-principle_econ_year.csv")
+
+head(econ_stat)
+```
+
+```{r}
+# convert the data from wide from to long form, which is required by ggplot
+econ_stat %>% gather(year, value, y2012:y2017)->econ_stat_long
+colnames(econ_stat_long)<-c("status","year","value")
+head(econ_stat_long)
+```
+
+```{r}
+# set the ordering of status factor
+
+levels(econ_stat_long$status) # This gives you the current level ordering (alphabetic)
+```
+```{r}
+econ_stat_long$status <- factor(econ_stat_long$status, levels = c("At work", "Unemployed", "Engaged on home duties", "Student", "Retired from employment", "Other"))
+
+levels(econ_stat_long$status) # This shows you the revised ordering (custom)
+```
+```{r}
+theme_set(theme_classic())
+
+fig<- ggplot(econ_stat_long, (aes(x= status, y=value, fill=year))) + 
+ geom_col(position="dodge", alpha=0.85) +
+  scale_y_continuous(
+    limits=c(0,2001),
+    breaks = seq(0, 2000, by =200),
+    expand = c(0, 0),
+    name = "person aged 15 years and over (Thousand)") +
+ 
+  scale_fill_viridis_d(name = NULL, end = 0.95, direction =-1, labels = c("2012","2013","2014","2015","2016","2017")) + # end value =095 cuts out really bright yellow at end of palette
+  
+  scale_x_discrete(labels = c("At work", "Unemployed", "Home duties", "Student", "Retired", "Other"), name = NULL)+
+ 
+  guides(fill = guide_legend(nrow = 1))+  # ggplot will tend to wrap lonfg horizontal legends. This tells it to use just one row for the legend elements
+  
+    theme(
+      axis.line.y = element_blank(),
+      axis.ticks.y = element_blank(),
+      axis.line.x = element_blank(),
+      axis.ticks.x = element_blank(),
+      axis.title = element_text(size=10),
+      panel.background=element_blank(),
+      panel.grid.major.y = element_line(size = 0.1, linetype = 'solid',colour = "white"),
+      panel.ontop = TRUE,
+    
+      plot.margin = margin(10, 6, 3, 3),
+    legend.position= c(0.7, 0.9), legend.direction="horizontal",
+    legend.text = element_text(size = 6), # legend text  was a little large
+    legend.key.size = unit(0.6, "lines"),# legend keys were a little large
+    legend.spacing.x = unit(0.1, 'cm'))
+
+
+fig
+```
+```{r}
+#library(colorblindr)
+
+#cvd_grid(fig)
+```
+
+### Faceted View
+
+
+Both Figures encode a single categorical variable by position along the x axis and another by bar color. The encoding by position is easy to read while the encoding by bar color requires more cognitive effort, as we have to visually match the colors of the bars against the colours in the legend.
+
+An approach that reduces this is to separate out the grouped plots into a panel of regular bar plots. In ggplot, this is known as faceting - and it is quite easy to facet an existing plot. The key idea is that you choose a variable whose values will determine the number of plots to be created. In this case, we will facet by the status variable, which will mean that ggplot will create 6 individual plots - one for each status value.
+
+The principle changes here are as follows:
+
+in the aes function x is set to year and y is set to value. This is because we want each panel to show values for the years 2012 - 2017.
+we set the fill colour to static colour as we would do for a single (non-grouped) bar plot
+
+add the function facet_wrap(~status, scales = "free_x") to the plot. This tells ggplot to create a set of plots (facets) — one for each value of the status variable. The facets can be placed next to each other, wrapping with a certain number of columns or rows.
+The scales parameter is set to free_x. Normally, the axis scales on each facet are fixed, which means that they have the same size and range. They can be made independent, by setting scales to free, free_x, or free_y. In this case, we know that the year variable has the same values for each status value - so the use of scales = “free_x” would seem to be redundant. However, by including it, it forces ggplot to include the x-axis scale under each plot, which I think is easier to read.By default, it would otherwise put the x-axis scale at the bottom of the panel. Remove it and see for yourself. Finally, I’ve made some modifications to the title of each facet - known as strip text. I’ve done this in the theme function.
+
+```{r}
+#library(RColorBrewer)
+
+
+theme_set(theme_classic())
+
+fig<- ggplot(econ_stat_long, (aes(x= year, y=value))) + 
+ geom_col(fill="#5069be", alpha=0.85) +
+  scale_y_continuous(
+    limits=c(0,2001),
+    breaks = c(0, 500, 1000, 1500,2000),
+    expand = c(0, 0),
+    name = "person aged 15 years and over (Thousand)") +
+  
+  scale_x_discrete(labels = c("2012","2013","2014","2015","2016","2017"), name = NULL) +
+  
+  facet_wrap(~status,ncol=3,scales = "free_x") +
+  
+    theme(
+      axis.line.y = element_blank(),
+      axis.ticks.y = element_blank(),
+      axis.line.x = element_blank(),
+      axis.ticks.x = element_blank(),
+      axis.title.x = element_text(size=8),
+      axis.title.y = element_text(size=8),
+      axis.text.x =   element_text(size=6),
+      axis.text.y =   element_text(size=6),
+
+    panel.spacing.y = grid::unit(14, "pt"),
+    strip.text = element_text(size = 8),
+    strip.background = element_blank(),
+    plot.margin = margin(10, 6, 3, 3),
+    panel.background=element_blank(),
+      panel.grid.major.y = element_line(size = 0.1, linetype = 'solid',colour = "white"),
+      panel.ontop = TRUE) 
+
+fig
+```
+
