@@ -1,0 +1,259 @@
+---
+title: "Visualising Amounts 2"
+author: "Prakhar"
+date: "03/04/2021"
+output:
+  html_document: default
+  word_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+### Colouring bars by a second variable
+
+You may want to colour bars according to a second variable, typically a categorical variable. In this example, we’ll use the mtcars data set, a data set built into R.
+
+```{r}
+# Load data
+data("mtcars")
+dfm <- mtcars
+# Convert the cyl variable to a factor
+dfm$cyl <- as.factor(dfm$cyl)
+# Add the name colums
+dfm$name <- rownames(dfm)
+# Inspect the data
+head(dfm[, c("name", "wt", "mpg", "cyl")])
+```
+
+When I am working on a plot, I like to occasionally check the colours in the palette I am using. The scales package provides a function called show_col for a quick and dirty way to visualise any vector of colours.
+
+```{r}
+library(scales)
+
+theme_set(theme_classic())
+
+# colour blind friendly palette 
+cbPal <- c("#999999", "#E69F00", "#56B4E9", "#009E73", "#F0E442", "#0072B2", "#D55E00", "#CC79A7")
+
+# scales function
+show_col(cbPal)
+```
+
+```{r}
+# I need 3 colours only for the cyl variable
+cb3 <-cbPal[c(6,2,1)]
+
+ggplot(dfm, (aes(x= reorder(name, -mpg) , y=mpg, fill=cyl))) + 
+  geom_col(width=0.7) +
+  
+  scale_y_continuous(limits = c(0, 35),
+                     breaks = c( 10,  20,  30),
+                     name = "miles per gallon") +
+  scale_fill_manual(values=cb3, name="Number of cylinders") +
+  
+    theme(
+      axis.line.y = element_blank(),
+      axis.ticks.y = element_blank(),
+      axis.line.x = element_blank(),
+      axis.ticks.x = element_blank(),
+      axis.text.x = element_text(size = 6, angle = 90, vjust = 1, hjust = 1),
+      axis.title.x = element_blank(),
+      plot.margin = margin(6, 6, 3, 3),
+      panel.background=element_blank(),
+      panel.grid.major.y = element_line(size = 0.2, linetype = 'solid',colour = "white"),
+      panel.ontop = TRUE, 
+      legend.position= c(0.6, 0.92), legend.direction="horizontal",
+      legend.text = element_text(size = 6), # legend text  was a little large
+      legend.key.size = unit(0.6, "lines"),
+      legend.title = element_text(size =10))# legend keys were a little large
+```
+If we have space we can reorient this plot into a vertical alignment, which will make the car names makes easier to read.
+
+While this is much easier to read – it also takes up at least twice as much vertical space. I’ve increased the number of breaks here also – because your eye has further to travel from the top of the bar vertically down to the x axis.
+
+Which version you use really depends on the space you have available and the priority you place on the reader being able to read quickly through the rank order of the cars.
+
+```{r}
+ggplot(dfm, (aes(x= reorder(name, mpg) , y=mpg, fill=cyl))) + 
+  geom_col(width=0.8) +
+  
+  coord_flip(clip = "off") +
+  
+  scale_y_continuous(limits = c(0, 35),
+                     breaks = seq(0,35, by=5),
+                     name = "Miles per gallon",
+                     expand = c(0, 0)) +
+  scale_fill_manual(values=cb3, name="Number of cylinders") +
+  
+    theme(
+      axis.line.y = element_blank(),
+      axis.ticks.y = element_blank(),
+      axis.line.x = element_blank(),
+      axis.ticks.x = element_blank(),
+      axis.text.x = element_text(size = 7),
+      axis.text.y = element_text(size = 7),
+      #axis.title.x = element_blank(),
+      axis.title.y = element_blank(),
+      plot.margin = margin(6, 6, 3, 3),
+      panel.background=element_blank(),
+      panel.grid.major.x = element_line(size = 0.2, linetype = 'solid',colour = "white"),
+      panel.ontop = TRUE, 
+      legend.position= "top", legend.direction="horizontal",
+      legend.text = element_text(size = 7), # legend text  was a little large
+      legend.key.size = unit(0.7, "lines"), # legend key size was a little large
+      legend.title = element_text(size =10))# legend title  was a little large
+```
+
+### Ordering within groups
+In the two plots of the car data produced so far, the bars are coloured according to the values of the cyl variable.
+
+We can add secondary ordering which might be useful in some contexts, where we order the mpg variable within the bars grouped by the cylinder variable
+
+This requires telling ggplot the order we want the x-axis values plotted in. I use the order function to order the name values by cyl and then by mpg
+
+I then explicitly set the factor levels of the name variable to this order. As I mentioned earlier, ggplot will plot the values of a categorical variable according to the order of its levels.
+
+
+```{r}
+# names sorted by first by name and then by mpg
+nameorder <- dfm$name[order(dfm$cyl, dfm$mpg)]
+
+# Now we turn name into a factor, with levels in the order of name order
+dfm$name <-factor(dfm$name, levels = nameorder)
+
+ggplot(dfm, (aes(x= name,  y=mpg, fill=cyl))) + 
+  geom_col(alpha = 0.85, width=0.7) +
+  
+  scale_y_continuous(limits = c(0, 35),
+                     breaks = c( 10,  20,  30),
+                     name = "miles per gallon") +
+  scale_fill_manual(values=cb3, name="Number of cylinders") +
+  
+    theme(
+      axis.line.y = element_blank(),
+      axis.ticks.y = element_blank(),
+      axis.line.x = element_blank(),
+      axis.ticks.x = element_blank(),
+      axis.text.x = element_text(size = 6, angle = 90, vjust = 1, hjust = 1),
+      axis.title.x = element_blank(),
+      plot.margin = margin(6, 6, 3, 3),
+      panel.background=element_blank(),
+      panel.grid.major.y = element_line(size = 0.2, linetype = 'solid',colour = "white"),
+      panel.ontop = TRUE, 
+      legend.position= c(0.75, 0.92), legend.direction="horizontal",
+      legend.text = element_text(size = 6), # legend text  was a little large
+      legend.key.size = unit(0.6, "lines"),
+      legend.title = element_text(size =10))# legend keys were a little large
+```
+### Diverging Bar Charts
+
+
+A Diverging Bar Chart or a Deviation Chart a is a bar chart that can handle both negative and positive values. The graph shows the divergence of quantitative values from a reference value — this can be zero or a mean value
+
+We’ll use a subset of the climate dataset in the gcookbook package. This data set includes estimated global temperature anomaly data for the years 1800 through 2011. The anomaly is the difference from the baseline temperature, which is the mean of the yearly temperatures from 1951-1980.
+
+We will visualise the values of the Anomaly10y field which has positive and negative values. The Anomaly10y field gives the temperature anomaly in Celsius, smoothed over ten years.
+
+```{r}
+
+library(gcookbook)
+
+data(climate)
+
+head(climate)
+```
+
+A diverging bar chart typically has a colour coding for positive and negative values. To represent this easily we will create a new column pos containing boolean values — TRUE when an Anomaly10y value is positive and FALSE when it is negative. This will allow us to map colour as an aesthetic to the values of the pos field. We will then manually specify the two colours that will represent the boolean values of the pos variable.
+
+
+```{r}
+
+library(gcookbook)
+library(dplyr)
+
+attach(climate)
+
+# using dplyr to create a subset of data to visualise 
+climate_sub <- climate %>% 
+  filter(Source=="Berkeley" & Year >= 1900) %>% # filter rows by Source=="Berkeley" & Year >= 1900
+  mutate(pos = Anomaly10y >=0) # create a new colum called pos with boolean values equal to the outcome of Anomaly10y >=0
+
+# This is a non-dplyr way to do the very same thing. Dplyr is very handy!
+climate_sub <- climate[which(Source=="Berkeley" & Year >= 1900),]
+climate_sub$pos <- factor(ifelse(climate_sub$Anomaly10y >= 0, "TRUE", "FALSE"), levels = c("TRUE", "FALSE"))
+
+# just removing the cols I won't be using.
+climate_sub <- climate_sub[,c(1,2,5,7)]
+
+detach(climate) 
+```
+Now we create the diverging bar chart. The x-axis represents the Year values. The y-axis represents the Anomaly10y values; and we will colour the bars according to the values in the pos column.
+
+Note that we have used position = “identity” within the geom_col function. This prevents an warning message being generated about stacking not being well defined for negative values
+
+I’ve used the scales package to format the y-axis in the scale_y_continuous function (instead of using scientific notation). I could also simply have specified a vector of labels from -0.3 to 0.9.
+
+
+```{r}
+library(scales)
+
+# I need 2 colours  for the pos variable which I select from the previously defined palette 
+cb2 <-cbPal[c(7,6)]
+
+ggplot(climate_sub, aes(x = Year, y = Anomaly10y, fill = pos)) + 
+  geom_col(position = "identity", alpha = 0.85, width=0.7) +
+  
+  scale_y_continuous(limits = c(-0.35, 1),
+                     breaks = seq(-0.3, 0.9, by= 0.1) ,
+                     name = "Anomaly10y",
+                     expand=c(0,0),
+                     labels = scales::number_format(accuracy = 0.1)) +
+  #scale_y_continuous(sec.axis = dup_axis(), breaks = c( -0.25,  0,  0.25, 0.5, 0.75),expand=c(0,0), name = "") +
+  
+  scale_x_continuous(breaks = c( 1900,  1920,  1940, 1960, 1980, 2000)) +
+  scale_fill_manual(values=cb2) +
+  
+    theme(
+      axis.line.y = element_blank(),
+      axis.ticks.y = element_blank(),
+      axis.line.x = element_blank(),
+      #axis.ticks.x = element_blank(),
+      #axis.text.x = element_text(angle = 90, vjust = 1, hjust = 1),
+      axis.title.x = element_blank(),
+      plot.margin = margin(6, 6, 3, 3),
+     panel.background=element_blank(),
+      panel.grid.major.y = element_line(size = 0.2, linetype = 'solid',colour = "white"),
+      panel.ontop = TRUE,
+      legend.position = "none"
+      
+    )
+```
+
+```{r}
+ggplot(climate_sub, aes(x = Year, y = Anomaly10y, fill = pos)) + 
+  geom_col(position = "identity", alpha = 0.85, width=0.7) +
+  
+
+  scale_y_continuous(sec.axis = sec_axis(~ ., breaks = seq(-0.3, 0.9, by= 0.1),labels = scales::number_format(accuracy = 0.1) ), breaks = seq(-0.3, 0.9, by= 0.1),expand=c(0,0),  labels = scales::number_format(accuracy = 0.1)) +
+  
+  scale_x_continuous(breaks = c( 1900,  1920,  1940, 1960, 1980, 2000)) +
+  scale_fill_manual(values=cb2) +
+  
+    theme(
+      axis.line.y = element_blank(),
+      axis.ticks.y = element_blank(),
+      axis.line.x = element_blank(),
+      #axis.ticks.x = element_blank(),
+      #axis.text.x = element_text(angle = 90, vjust = 1, hjust = 1),
+      axis.title.x = element_blank(),
+      plot.margin = margin(6, 6, 3, 3),
+     panel.background=element_blank(),
+      panel.grid.major.y = element_line(size = 0.2, linetype = 'solid',colour = "white"),
+      panel.ontop = TRUE,
+      legend.position = "none"
+      
+    )
+```
+
