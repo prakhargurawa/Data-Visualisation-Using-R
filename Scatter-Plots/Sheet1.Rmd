@@ -1,0 +1,167 @@
+---
+title: "Practice1"
+author: "Prakhar"
+date: "03/04/2021"
+output:
+  word_document: default
+  html_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+## GGPlot
+
+Every ggplot2 plot has 3 key components - Data - Aesthetic Mappings between variables in the data and visual properties - Geometrics Layer (geom) that describes what visual elements are used to visually render the data.
+In terms of the other layers, ggplot2 uses sensible default settings, which we will learn to override and customize
+
+
+## Scaterplot
+A scatterplot is simple graph in which the values of two variables are plotted along two axes. The resulting visualisation may reveal a correlation between the variables. In this session you will learn how to put together a a scatter plot like the one shown here.
+
+```{r}
+data1 <- read.csv("country_data.csv")
+# str gives the type of the data container (a data.frame), the variables and types
+str(data1)
+```
+```{r}
+# head shows the first few rows of the data
+head(data1) 
+```
+
+### Defining aesthetic mapping
+
+The aesthetic mapping for the first version of our scatter plot will map the values of var_a to the scale of the x axis and the values of var_b to the scale of the y-axis. We will ignore country for now. The aes() function is used to specify the X and Y axes.
+
+```{r}
+# we first tell R that we will use functions from the ggplot2 package
+library(ggplot2)
+
+# the ggplot function takes the data and aesthetic mapping function aes as arguments
+g <-ggplot(data1, aes(x=var_a, y=var_b))
+
+g 
+```
+
+###  Adding a geometrics layer
+
+A blank ggplot is drawn. Even though the x and y are specified, there are no points or lines in it. This is because, we have only created the first two layers - data and aesthetic mapping. We now need to tell ggplot the types of geometrics we want to use to visually represent the values of our variables. In ggplot these are known as geoms and every geom is prefixed by geom_
+
+For a list of the possible geoms see The Geoms Layer
+
+We will use geom_point which will place a point on the graph at each (var_a, var_b)
+
+Note how we add the geom_point using the + operator.
+
+```{r}
+g <-ggplot(data1, aes(x=var_a, y=var_b)) +
+  geom_point() 
+
+g 
+```
+### Adding an additional aesthetic mapping
+
+We have a very basic scatterplot, where each point represents a var_a and var_b value. We will now add another aesthetic mapping to handle the country factor. This variable has two values green and blue. We will map these to two colours. At first we will allow ggplot to assign the colours using its defaults. Then we will override the colours assigned.
+
+```{r}
+g <-ggplot(data1, aes(x=var_a, y=var_b, colour=country)) +
+  geom_point() 
+
+g 
+```
+### Changing the default colours
+
+The colour aesthetic mapping visually groups the instances with the same level value. For easier interpretation, we will make the points with the level ireland green and those with the level scotland blue. To do this, we have to manually assign the colours by specifying a vector of colours, in this case, of size 2. We do this by passing the vector of colours to the scale_colour_manual function. In general, the functions of typescale_ 'x' _ manual enable you to override the default mappings ggplot makes to the visual scale of the aesthetic. 
+
+
+```{r}
+g <-ggplot(data1, aes(x=var_a, y=var_b, colour=country)) +
+  geom_point(size=2.5) + # Note that I've increased the point size
+  # This function allows you to manually override the default colour mappings defined by the aes function. 
+  scale_colour_manual(values = c( "green4","blue","red","black")) 
+  
+g 
+```
+### Changing alpha values
+
+The alpha value controls the transparency of the geometric. Alpha values are in the range (0,1) where 0 means that the point is completely transparent or invisible. In this case, we want to lower the alpha value of the blue points. To manually set the transparency values of two sets of points to different values, we have to treat alpha as an aesthetic that is mapped to the variable that seperates the points. Here the points with the country value of blue should have a lower alpha than points with country value green. Therefore, we map the alpha scale to the values of the variable country. We then override the default mappings using a scale_alpha_manual function, just as we did when manually setting the colour of the points.
+
+```{r}
+g <-ggplot(data1, aes(x=var_a, y=var_b, colour=country, alpha= country)) +
+  geom_point(size=2.5) + 
+  scale_colour_manual(values = c( "green4","blue","red","black"))  +
+  scale_alpha_manual(values = c(1, 0.6,1,0.4)) 
+  
+g 
+```
+###  Changing Geom Shape
+
+Another approach would be to change the shape of the points so that, even when they overlap on the graph, we can still perceive two different points.
+
+```{r}
+g <-ggplot(data1, aes(x=var_a, y=var_b, colour=country, shape=country)) + 
+  geom_point(size=2.5) + 
+  scale_colour_manual(values = c( "green4","blue","red","black"))  +
+  scale_alpha_manual(values = c(1, 0.6,1,0.4))  +
+  scale_shape_manual(values = c(8, 1,9,10)) 
+  
+  
+g 
+```
+### Adjusting the themes layer
+
+title : use the ggtitle function
+change the labels on the x and y axis : use xlab and ylab functions
+place more breaks in the x axis :  as the x axis uses a continuous scale, we make adjustments to its default layout using the scale_x_continuous function. In this case we set the breaks () attribute using a vector of custom values
+Change the background : we can change the grey background by specifying the background colour as white in the theme function. However, as the default grid-lines are also white, we lose sight of them against the white background. We can specify the colour of the grid-lines as lightgrey as I have done below.
+Change the size of the axis text : The default size for the axis text is often too small in my opinion. You can change it within the theme function using axis.text = element_text(size =10)
+Change the size of the axis title : Again I find that the default size of the axis title is often too small. In this case, I change it to size 12.
+```{r}
+g <-ggplot(data1, aes(x=var_a, y=var_b, colour=country, shape=country)) +
+  geom_point(size=2.5) + 
+  scale_colour_manual(values = c( "green4","blue","blue","black")) +
+  scale_shape_manual(values = c(8, 1,9,10)) +
+  ggtitle("Performance") +
+  xlab("a values") + # new label for x axis
+  ylab ("b values") + # new label for x axis
+  scale_x_continuous(breaks= c(4,6,8,10,12,14)) +
+  
+  theme(panel.background = element_rect(fill = "white"),
+        panel.grid.major = element_line(size = 0.25, linetype = 'solid',
+                                colour = "lightgrey"), 
+        panel.grid.minor = element_line(size = 0.1, linetype = 'solid',
+                                colour = "lightgrey"),
+        axis.text = element_text(size =10),
+        axis.title = element_text(size =12))
+g 
+```
+```{r}
+g <-ggplot(data1, aes(x=var_a, y=var_b, colour=country, shape=country)) +
+  geom_point(size=2.5) + 
+  scale_colour_manual(values = c( "green4","blue","red","black")) +
+  scale_shape_manual(values = c(8, 1,9,10)) +
+  ggtitle("Performance: Ireland versus Scotland") +
+  xlab("a values") + # new label for x axis
+  ylab ("b values") + # new label for x axis
+  scale_x_continuous(breaks= c(4,6,8,10,12,14)) +
+  
+  theme_bw() + # prerolled theme 
+  theme (axis.text = element_text(size =10),
+        axis.title = element_text(size =12))  # I still want to override the default axis text size
+
+g
+```
+### Final Touch
+```{r}
+g <-ggplot(data1, aes(x=var_a, y=var_b, colour=country,shape=country)) + geom_point(size = 2.5) + scale_shape_manual(values=c(20,8,15,5),labels=c("England","Ireland","Scotland","Wales")) + scale_colour_manual(values = c( "red","blue","green4","black"),labels=c("England","Ireland","Scotland","Wales")) + scale_alpha_manual(values = c(0.1,0.5,0.7,1),labels=c("England","Ireland","Scotland","Wales"))  +  ggtitle("Performance: Ireland/Scotland/England/Wales") + xlab("a values") + ylab ("b values") +  scale_x_continuous(breaks = seq(0,20,2.5)) + scale_y_continuous(breaks = seq(0,15,2.5)) + theme(panel.background = element_rect(fill="#E6E3C5"),panel.grid.major = element_line(size = 0.25, linetype = 'solid',
+                                colour = "white"), 
+        panel.grid.minor = element_line(size = 0.1, linetype = 'solid',
+                                colour = "white"),
+        axis.text = element_text(size =10),
+        axis.title = element_text(size =12))
+
+
+g 
+
+```
+
