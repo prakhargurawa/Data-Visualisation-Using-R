@@ -1,0 +1,479 @@
+---
+title: "Stacked Bar Charts"
+output: html_notebook
+---
+
+
+```{r}
+library(dplyr)
+library(igraph)
+library(forcats)
+
+dail_32 <- read.csv("ire_dail_parties-2016-20.csv")
+dail_32<-dail_32%>%select(c(1,3))
+
+
+# replace parties with 1 seat with a collective 'other parties'
+oth<- dail_32%>%filter(X2020<2)%>%select(X2020)%>%summarise(sum(X2020))
+oth$party <-"Other/Vacant"
+oth<- oth %>% rename("X2020" ="sum(X2020)" )
+
+# filter our these seats
+dail_32<-dail_32%>%filter(X2020>=2)
+# add the ' Other' row
+colnames(dail_32) <- c("party","X2020")
+dail_32<-rbind(dail_32, oth)
+
+# calculate proportions
+dail_32$X2020_prop <- round(dail_32$X2020*100/sum(dail_32$X2020),0)
+
+# add a shortened name for each party
+dail_32$short <- c("FG", "FF", "SF", "IND", "LAB","S/PBP","SDP", "GP", "OTH" )
+
+# add a display label for each party
+dail_32$label <- paste0(dail_32$short,":",dail_32$X2020_prop,"%")
+
+head(dail_32)
+```
+```{r}
+library(scales)
+
+# possible colours
+mycols <- c('#a6cee3','#1f78b4','#fb9a99','#b2df8a','#e31a1c','#ff7f00','#fdbf6f','#33a02c','#cab2d6')
+
+
+party.colours <- c('FG' = '#1f78b4', 'FF' = '#33a02c', 'SF' = 'darkolivegreen', 'LAB' = '#e31a1c',  'GP' = '#b2df8a', 'SDP' ='#cab2d6','#fb9a99', 'IND' = 'darkgrey', 'REN' = '#ff7f00', 'DDI' ='darkgrey','AAA' ='darkgrey', "OTH"='#fb9a99',"S/PBP"= '#fdbf6f')
+
+# a handy way to see colours in your palette. show_col is in the scales package
+show_col(party.colours)
+```
+
+```{r}
+library(ggplot2)
+library(forcats)
+
+theme_set(theme_classic())
+
+# handy way to reorder factors
+dail_32<-dail_32%>%mutate(party = fct_reorder(party, -X2020))
+
+ggplot(dail_32, (aes(x= party, y=X2020, fill=short))) + 
+  geom_col(width=1, colour="white") +
+  
+geom_text(aes(label=label, group = party), colour="white", size =3, position = position_stack(vjust = .6))+ # allow you to postion a label in the middle of each bar
+  
+scale_y_continuous(limits = c(0, 50),
+                     breaks = seq(5,50, by = 5),
+                     name = "seats") +
+  
+  scale_fill_manual(values = party.colours)+
+  
+  ggtitle("32nd Dail: 2020 by party ") +
+  
+    theme(
+      legend.position = "none",
+      #axis.title.y = element_blank(),
+      axis.line.y = element_blank(),
+      axis.ticks.y = element_blank(),
+      axis.line.x = element_blank(),
+      axis.ticks.x = element_blank(),
+      #axis.text.x = element_text(angle = 45, vjust = 1, hjust = 1),
+      axis.text.x = element_blank(),
+      axis.title.x = element_blank(),
+      plot.title = element_text(vjust = -8, hjust = 0.25, size = 11),
+      plot.margin = margin(6, 6, 3, 3),
+      panel.background = element_blank(),
+      #panel.grid.major.y = element_line(size = 0.05, linetype = 'solid',colour = "white"),
+      panel.grid.major.y = element_blank(),
+      panel.ontop = TRUE
+      
+    )
+```
+```{r}
+library(ggplot2)
+library(forcats)
+
+theme_set(theme_classic())
+
+# handy way to reorder factors
+dail_32<-dail_32%>%mutate(party = fct_reorder(party, -X2020))
+
+ggplot(dail_32, (aes(x= party, y=X2020))) + 
+  geom_col(width=1, colour="white", fill="#1f78b4") +
+  
+geom_text(aes(label=label, group = party), colour="white", size =3, position = position_stack(vjust = .6))+ # allow you to position a label in the middle of each bar
+  
+scale_y_continuous(limits = c(0, 50),
+                     breaks = seq(5,50, by = 5),
+                     name = "seats") +
+  
+  ggtitle("32nd Dail: 2020 by party ") +
+  
+    theme(
+      legend.position = "none",
+      #axis.title.y = element_blank(),
+      axis.line.y = element_blank(),
+      axis.ticks.y = element_blank(),
+      axis.line.x = element_blank(),
+      axis.ticks.x = element_blank(),
+      #axis.text.x = element_text(angle = 45, vjust = 1, hjust = 1),
+      axis.text.x = element_blank(),
+      axis.title.x = element_blank(),
+      plot.title = element_text(vjust = -8, hjust = 0.25, size = 11),
+      plot.margin = margin(6, 6, 3, 3),
+      panel.background = element_blank(),
+      #panel.grid.major.y = element_line(size = 0.1, linetype = 'solid',colour = "white"),
+      panel.grid.major.y = element_blank(),
+      
+      panel.ontop = TRUE
+      
+    )
+```
+```{r}
+library(ggplot2)
+library(forcats)
+library(RColorBrewer)
+
+# View a single RColorBrewer palette by specifying its name
+display.brewer.pal(n = 9, name = 'Set1')
+```
+
+```{r}
+# Hexadecimal color specification 
+brewer_cols <- brewer.pal(n = 9, name = "Set1")
+
+theme_set(theme_classic())
+
+# handy way to reorder factors
+dail_32<-dail_32%>%mutate(party = fct_reorder(party, -X2020))
+
+ggplot(dail_32, (aes(x= party, y=X2020, fill=short))) + 
+  geom_col(width=1, colour="white") +
+  
+geom_text(aes(label=label, group = party), colour="white", size =3, position = position_stack(vjust = .6))+ # allow you to postion a label in the middle of each bar
+  
+scale_y_continuous(limits = c(0, 50),
+                     breaks = seq(5,50, by = 5),
+                     name = "seats") +
+  
+   scale_fill_brewer(type = "qual", palette="Set1")+
+  
+  ggtitle("32nd Dail: 2020 by party ") +
+  
+    theme(
+      legend.position = "none",
+      #axis.title.y = element_blank(),
+      axis.line.y = element_blank(),
+      axis.ticks.y = element_blank(),
+      axis.line.x = element_blank(),
+      axis.ticks.x = element_blank(),
+      #axis.text.x = element_text(angle = 45, vjust = 1, hjust = 1),
+      axis.text.x = element_blank(),
+      axis.title.x = element_blank(),
+      plot.title = element_text(vjust = -8, hjust = 0.25, size = 11),
+      plot.margin = margin(6, 6, 3, 3),
+      panel.background = element_blank(),
+      #panel.grid.major.y = element_line(size = 0.1, linetype = 'solid',colour = "white"),
+      panel.grid.major.y = element_blank(),
+      
+      panel.ontop = TRUE
+      
+    )
+```
+### Pareto chart
+By adding a line that tracks the cumulative percentages of the bars in descending order, we address the problem we first observed with a side by bar chart approach - that the relationship of each bar to the total is not visually obvious.
+
+Here, the contribution of each bar to the cumulative total is clear. We can see immediately that the first four parties occupy 86% of all seats.
+
+We can also judge that the Labour party occupies 4% of seats (90-86%).
+```{r}
+library(ggplot2)
+library(forcats)
+library(dplyr)
+
+
+dail_32 <- dail_32 %>% arrange(-X2020_prop, party)%>%
+  mutate(cumulative = cumsum(X2020_prop))
+
+total_seats <- sum(dail_32$X2020)
+
+# redo the label to show num seats
+dail_32$label <- paste0(dail_32$short,":",dail_32$X2020)
+
+theme_set(theme_classic())
+
+# handy way to reorder factors
+#dail_32<-dail_32%>%mutate(party = fct_reorder(party, -X2020))
+
+ggplot(dail_32, (aes(x= party, y=X2020, fill=short))) + 
+  geom_col(width=1, colour="white") +
+  
+#geom_text(aes(label=label, group = party), colour="white", size =2.7, position = position_stack(vjust = .6)) + # allow you to position a label in the middle of each bar
+  
+# the pareto line 
+  geom_line(aes(x = party, y =(cumulative*total_seats)/100), position=position_nudge(x = 0.5, y = 0), group = 1, col="#ca0020") + # NB: Must use "group = 1"
+  # points on the pareto line 
+  geom_point(aes(x  = party, y = (cumulative*total_seats)/100), position=position_nudge(x = 0.5, y = 0), size =1, col="grey") +
+  
+  geom_text(aes(x = party, y = (cumulative*total_seats)/100, label = sprintf("%1.2i%%", cumulative)),  size = 3, nudge_x = 0.37,nudge_y = 6)   +
+  
+  
+scale_y_continuous(limits = c(0, 170),
+                     breaks = seq(10,160, by = 10),
+                     name = "seats") +
+  
+scale_x_discrete(labels = dail_32$label, expand = c(0,0.1))+
+  
+  scale_fill_manual(values = party.colours)+
+  
+  ggtitle("32nd Dail: 2020 by party ") +
+  
+    theme(
+      legend.position = "none",
+      #axis.title.y = element_blank(),
+      axis.line.y = element_blank(),
+      axis.ticks.y = element_blank(),
+      axis.line.x = element_blank(),
+      axis.ticks.x = element_blank(),
+      axis.text.x = element_text(vjust = 8),
+      
+      axis.title.x = element_blank(),
+      plot.title = element_text(vjust = -8, hjust = 0.25, size = 11),
+      plot.margin = margin(6, 6, 3, 3),
+      panel.background = element_blank(),
+      #panel.grid.major.y = element_line(size = 0.05, linetype = 'solid',colour = "white"),
+      panel.grid.major.y= element_blank(),
+      panel.ontop = TRUE
+      
+    ) +
+  expand_limits(x = c(3, 10))
+```
+## Vertical Stacked Bar charts
+
+We can replace the side by side bar chart with a single stacked bar chart. It is is better at giving visual sense of the proportions of each bar within the whole.
+
+This is the bar equivalent of a pie chart, and it is better because it is easier to judge relative proportions of lengths than areas of a circle
+
+I have ordered the bar bottom up in descending order – which means that the smaller proportions are together at the top of the chart and it is easier to judge their relative proportions than if they were interspersed through out the bar
+
+The plot here has labels within each bar segment showing the percentage values – which does give a sense, although not visual, of the proportions represented by each bar.
+
+The plot has a legend, which adds extra cognitive load to the reader in reconciling the bar colours to the legend keys.
+
+To create a stacked bar, you need to create a dummy variable on x axis. Here it is x=2020
+
+To get the bar to be narrow like this, you have to set the width in your rendering environment. In the {r} section enclosing this code in the rmd file, I set the fig.width=3.
+
+```{r}
+library(ggthemes)
+
+
+mycols<-rev(mycols)
+
+#handy way to reverse order of rows
+dail_32<-dail_32%>%mutate(short = fct_reorder(short, X2020))%>%arrange(X2020)
+
+
+
+ggplot(dail_32, aes(x = "2020", y = X2020, fill = short))+
+  geom_col(width = 0.4) +
+  geom_text(aes(label = paste0(X2020_prop, "%")),
+            position = position_stack(vjust = 0.5), size=2.75, colour = "white") +
+  
+  scale_y_continuous(breaks = seq(0,160, by = 20), expand=c(0,0))+
+  scale_x_discrete( expand = c(0, 0))+
+  
+   
+  scale_fill_manual(values = party.colours)+
+  theme(legend.position = "right", 
+        legend.title = element_blank()) +
+  theme(axis.title.y = element_text(margin = margin(r = 10)),
+        axis.title.x = element_blank(),
+        axis.line.x = element_blank(),
+        axis.line.y = element_blank(),
+        axis.text.x =  element_blank(),
+        axis.ticks.x =  element_blank()) +
+  #theme(aspect.ratio = .2) +
+  ylab("Seats") +
+  xlab(NULL)
+```
+In the next version, I’ve removed the legend and placed the party labels within the bars. In order to give a sense of the overall percentage of the whole I’ve put a second y axis on right of the figure.
+
+This is better solution than the pie chart by a long way – but it is still not a perfect solution by any means.
+
+Visually we can get a sense of the relative proportions – but it is hard to judge exact values. For instance, how many seats have Labour in the parliament?
+
+And we have labelling issues at the top where the percentages become very small.
+
+```{r}
+library(ggthemes)
+
+
+mycols<-rev(mycols)
+
+#handy way to reverse order of rows
+dail_32<-dail_32%>%mutate(short = fct_reorder(short, X2020))%>%arrange(X2020)
+
+
+ggplot(dail_32, aes(x = "2020", y = X2020, fill = short))+
+  geom_col(width = 0.4) +
+  geom_text(aes(label = short),
+            position = position_stack(vjust = 0.5), size=2.6, colour = "white") +
+  
+  scale_y_continuous(breaks = seq(0,160, by = 20), expand=c(0,0), sec.axis = sec_axis(~ ./ total_seats, labels = scales::percent,
+        name = "Percentage"))+
+  scale_x_discrete( expand = c(0, 0))+
+  
+  
+  #theme_economist(base_size = 8) +
+  scale_fill_manual(values = party.colours)+
+  theme(legend.position = "None", 
+        legend.title = element_blank()) +
+  theme(axis.title.y = element_text(margin = margin(r = 10)),
+        axis.title.x = element_blank(),
+        axis.line.x = element_blank(),
+        axis.line.y = element_blank(),
+        axis.text.x =  element_blank(),
+        axis.ticks.x =  element_blank()) +
+  #theme(aspect.ratio = .2) +
+  ylab("Seats") +
+  xlab(NULL)
+```
+## Horizontal Stacked Bar Charts
+A similar solution is the horizontal stacked bar chart. The principle is the same as the vertical stacked bar but I suggest that this much easier to read.
+
+As before the bars are ordered in descending order – but now, rather than from bottom to top we are reading from left to right, which is much more intuitive to western readers at least.
+
+There is still a labelling issue on the right hand side. I have added labels connected by line segments. It’s not an ideal solution - but where the bars become small and crowded there isn’t a lot of choice.
+```{r}
+library(ggplot2)
+library(forcats)
+library(dplyr)
+
+
+
+dail_32<-dail_32 %>% 
+  mutate(year = as.factor("2020"))
+
+#handy way to reverse order of rows
+dail_32<-dail_32%>%mutate(short = fct_reorder(short, X2020))%>%arrange(X2020)
+
+
+theme_set(theme_classic())
+
+annote_size <- 2.5
+v_just= -5
+
+
+ggplot(dail_32, aes(x=year, y=X2020, fill=short)) + 
+  geom_col(width = 0.2)  +
+  
+geom_text(aes(label=X2020, group = short), colour="white", size =3, position = position_stack(vjust = .5)) + # allow you to postion a label in the middle of each bar
+  
+scale_y_continuous(limits = c(0, 166),
+                   expand = c(0.0, 0),
+                  breaks = seq(5,160, by = 20),
+                    name = "seats") +
+  
+  #scale_x_discrete(expand = c(0,0 ))+
+  
+  scale_fill_manual(values = party.colours) +
+  
+  ggtitle("32nd Dail: 2020 by party ") +
+
+  
+  # Using manual annotation like this is far from ideal.
+  
+  annotate("text",  x="2020",vjust= v_just, y = 10, label = dail_32[9,4], size = annote_size, family = "Helvetica", colour = "black") +
+  
+  annotate("text",  x="2020", vjust= v_just,y = 60, label = dail_32[8,4], size = annote_size, family = "Helvetica", colour = "black") +
+    
+   annotate("text",  x="2020", vjust= v_just, y = 100, label = dail_32[7,4], size = annote_size, family = "Helvetica", colour = "black") +   
+  
+   annotate("text",  x="2020", vjust= v_just, y = 117, label = dail_32[6,4], size = annote_size, family = "Helvetica", colour = "black") + 
+  
+  annotate("text",  x="2020", vjust= v_just, y = 138, label = dail_32[5,4], size = annote_size, family = "Helvetica", colour = "black") + 
+  
+  annotate("text",  x="2020", vjust= v_just, y = 146, label = dail_32[4,4], size = annote_size, family = "Helvetica", colour = "black") + 
+  
+    annotate("text",  x="2020", vjust= v_just-2.5, y = 150, label = dail_32[3,4], size = annote_size, family = "Helvetica", colour = "black") +
+  
+  annotate("text",  x="2020", vjust= v_just-2.5, y = 156, label = dail_32[2,4], size = annote_size, family = "Helvetica", colour = "black") +
+  
+  annotate("text",  x="2020", vjust= v_just-2.5, y = 161, label = dail_32[1,4], size = annote_size, family = "Helvetica", colour = "black") +
+  
+  
+    coord_flip() +
+  
+    theme(
+      legend.position = "none",
+      axis.title.y = element_blank(),
+      axis.line.y = element_blank(),
+      axis.ticks.y = element_blank(),
+      axis.line.x = element_blank(),
+      axis.ticks.x = element_blank(),
+      #axis.text.x = element_text(angle = 45, vjust = 1, hjust = 1),
+      axis.text.y = element_blank(),
+      axis.text.x = element_blank(),
+      #axis.title.x = element_blank(),
+      plot.title = element_text(vjust = -8, hjust = 0.25, size = 11),
+      plot.margin = margin(6, 6, 3, 3),
+      #panel.background = element_blank(),
+      #panel.grid.major.y = element_line(size = 0.1, linetype = 'solid',colour = "white"),
+     # panel.ontop = TRUE
+      
+    )
+```
+## Waffle chart
+A related chart to this approach is the so-called waffle chart – named because the squares appear like the patterns on waffles apparently.
+
+In any case, visualisations like this are common in political analysis – as they convey the idea of actual seats occupied by each party. In the visualisation in the slide Fine Gael have 47 seats and therefore have 47 squares in the plot.
+
+From a perceptual perspective, the reader is required to assess quantity by area occupied by the squares. Area is generally hard to assess quantitatively – but the presence of the little squares makes it a little easier.
+```{r}
+ibrary(waffle)
+library(magrittr)
+library(hrbrthemes)
+library(ggplot2)
+library(dplyr)
+library(waffle)
+
+#reverse order of rows
+dail_32<-dail_32%>%mutate(short = fct_reorder(short, -X2020))%>%arrange(-X2020)
+
+
+dail_32  %>%
+  ggplot(aes(fill = short, values = X2020)) +
+  geom_waffle(n_rows = 6, size = 0.5, colour = "white", flip = FALSE) +
+  scale_fill_manual(
+    name = NULL,
+    values = party.colours
+  ) +
+  
+  
+  ggtitle("32nd Dail: 2020 by party ") +
+  coord_equal() +
+  theme_minimal()+
+  theme_enhance_waffle() +
+  theme(plot.title = element_text(size=10, hjust=0.07))
+```
+```{r}
+library(knitr)
+library(kableExtra)
+library(dplyr)
+
+values <- c(63,201,185)
+categories<- c("A", "B", "C")
+
+d<- data.frame(categories, values)
+d$percent <-round((100*values)/sum(values),0)
+
+d%>%arrange(-values) -> dd
+
+kable(dd, digits = 2, format = "html", row.names = FALSE) %>%
+  kable_styling(
+                full_width = F,
+                font_size = 12,
+                position = "center")
+```
+
