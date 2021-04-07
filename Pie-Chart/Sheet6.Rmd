@@ -1,0 +1,113 @@
+---
+title: "Pies and Proportions"
+output: html_notebook
+---
+
+We will look at how to represent basic proportions, emphasising alternatives to Pie charts
+
+Pie Charts
+Vertical Stacked Bars Charts
+Horizontal Stacked Bars Charts
+Pareto Charts
+Waffle Charts
+
+## The Pie Chart
+
+I’ll create a pie chart of the composition of the Irish parliament, the Dail, before the election in February 2020.
+
+This data was scraped from the oireachtais web site. I do some preprocessing on it to amalgamate some of the smaller parties/ vacant seats and the ceann comhairle (speaker of the parliament) into an ‘other’ category
+
+```{r}
+library(dplyr)
+library(igraph)
+library(forcats)
+
+dail_32 <- read.csv("ire_dail_parties-2016-20.csv")
+dail_32<-dail_32%>%select(c(1,3))
+
+
+# replace parties with 1 seat with a collective 'other parties'
+oth<- dail_32%>%filter(X2020<2)%>%select(X2020)%>%summarise(sum(X2020))
+oth$party <-"Other/Vacant"
+oth<- oth %>% rename("X2020" ="sum(X2020)" )
+
+# filter our these seats
+dail_32<-dail_32%>%filter(X2020>=2)
+# add the ' Other' row
+colnames(dail_32) <- c("party","X2020")
+dail_32<-rbind(dail_32, oth)
+
+# calculate proportions
+dail_32$X2020_prop <- round(dail_32$X2020*100/sum(dail_32$X2020),0)
+
+# add a shortened name for each party
+dail_32$short <- c("FG", "FF", "SF", "IND", "LAB","S/PBP","SDP", "GP", "OTH" )
+
+# add a display label for each party
+dail_32$label <- paste0(dail_32$short,":",dail_32$X2020_prop,"%")
+
+head(dail_32)
+```
+```{r}
+library(scales)
+
+# possible colours
+mycols <- c('#a6cee3','#1f78b4','#fb9a99','#b2df8a','#e31a1c','#ff7f00','#fdbf6f','#33a02c','#cab2d6')
+
+
+party.colours <- c('FG' = '#1f78b4', 'FF' = '#33a02c', 'SF' = 'darkolivegreen', 'LAB' = '#e31a1c',  'GP' = '#b2df8a', 'SDP' ='#cab2d6','#fb9a99', 'IND' = 'darkgrey', 'REN' = '#ff7f00', 'DDI' ='darkgrey','AAA' ='darkgrey', "OTH"='#fb9a99',"S/PBP"= '#fdbf6f')
+
+# a handy way to see colours in your palette. show_col is in the scales package
+show_col(party.colours)
+```
+### Making pie chart
+
+In terms of creating a pie chart, ggplot doesn’t have an oven ready version. Thanks to [this site]((https://www.datanovia.com/en/blog/how-to-create-a-pie-chart-in-r-using-ggplot2/) for insight on how to create it
+
+Compute the position of the text labels as the cumulative sum of the proportion:
+
+Arrange the grouping variable (short) in descending order. This is important to compute the y coordinates of labels. Recall that short refers to the shortened party name I created earlier
+
+To put the labels in the center of pies, we’ll use cumsum(prop) - 0.5*prop as label position.
+
+Key ggplot functions: geom_bar() + coord_polar().
+
+Add text labels: geom_text()
+
+Change fill color manually: scale_color_manual()
+
+Apply theme_void() to remove axes, background, etc
+
+
+```{r}
+library(ggrepel)
+
+set.seed(42)
+
+# sort by 2020 seats a
+#dail_32<-dail_32%>%mutate(party = fct_reorder(party, -X2020))%>%arrange(-X2020)
+
+# compute the position of the text labels as the cumulative sum of the proportion:
+# Arrange the grouping variable (short) in descending order. This is important to compute the y coordinates of labels.
+
+
+dail_32<- dail_32 %>%
+  arrange(desc(short)) %>%
+  mutate(lab.ypos = cumsum(X2020_prop) - 0.5*X2020_prop)
+
+
+ggplot(dail_32, aes(x = "", y = X2020_prop, fill = short)) +
+  geom_bar(width = 1, stat = "identity", color = "white", size=0.1, ) +
+  coord_polar("y", start = 0) +
+  #geom_text(aes(y = lab.ypos, label = label), color = "white") +
+  geom_text_repel(aes(y = lab.ypos, label = label),size=3, segment.color = "darkgrey", segment.size=0.3, nudge_x=0.6) + 
+  scale_fill_manual(values = party.colours, name= "Party") +
+  theme_void()
+```
+You can see that the big issue is the difficulty in judging the proportions of the smaller segments.
+
+Also from a practical perspective, the small segments make labelling difficult.
+
+I had to use the ggrepel library for this, which places labels on the plot so that they do not overlap.
+
+
