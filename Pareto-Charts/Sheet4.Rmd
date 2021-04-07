@@ -1,0 +1,146 @@
+---
+title: "Pareto charts"
+output:
+  word_document: default
+  html_document:
+    df_print: paged
+---
+A Pareto chart is a bar chart (with the bars ordered) combined with a line chart that shows the cumulative total or frequency of the bar values.
+
+It is very useful for seeing at a glance what proportion of the data is represented by the first n bars.
+
+It allows us to visualise how ranked quantities contribute to the whole
+
+It is useful for revealing something like the 80-20 rule—e.g. 80% of the accidents are due to 20% of the possible reasons.
+
+The data for the example below came from the Road Safety Authority (RSA) of Ireland (https://www.rsa.ie/en/RSA/Road-Safety/RSA-Statistics/) from the report on its web site on Vehicle factors in fatal accidents on Irish roads 2012 to 2018.
+
+The visualisation shows the disproportionate involvement of private cars in fatal road accidents in the period.
+
+There is a little bit of data preparation required for the Pareto chart. We need to represent the cumulative frequency of occurrence of the category values we wish to plot.
+ 
+
+```{r}
+# load packages
+library(dplyr)
+library(ggplot2)
+
+fatal_acc <- read.csv("RSA_vehicle_fatal_accidents-2012-2018xlsx.csv")
+# str gives the type of the data container (a data.frame), the variables and types
+str(fatal_acc)
+```
+```{r}
+# If we want to plot this as a pareto chart we need to represent the cumulative frequency of occurrence in ascending order
+
+fatal_acc_df_cumulative <- fatal_acc %>%
+  mutate(relative_freq = n/sum(n), cumulative_freq = cumsum(relative_freq))
+
+colnames(fatal_acc_df_cumulative) <-c("vehicle","n","relative_freq","cumulative_freq")
+head(fatal_acc_df_cumulative)
+```
+
+The first plot is a standard bar chart of the data. It’s fine. However, we are after a chart that shows us the breakdown of values per vehicle type - but also shows us the cumulative contribution of the top ranked categories to the whole.
+
+```{r}
+library(scales)
+
+# plot
+p <- 
+  ggplot(fatal_acc_df_cumulative, aes(x = reorder(vehicle, -n), y = n)) +
+  geom_col(width = 1, fill = "#0571b0", color="white") + 
+  
+  scale_y_continuous(breaks=seq(0,1000, by =100)) + 
+  
+ggtitle("vehicles involved fatal road accidents 2012-2018 ") + 
+  
+  #labs(x = "", y = "Number of vehicles") +
+  theme(plot.title = element_text(hjust = 0.5),
+      axis.line.y = element_blank(),
+      axis.ticks.y = element_blank(),
+      axis.line.x = element_blank(),
+      axis.ticks.x = element_blank(),
+      axis.title.y  = element_blank(),
+      axis.title.x  = element_blank(),
+      axis.text.x = element_text(size = 6, angle = 45, vjust = 1, hjust = 1),
+      panel.background=element_blank(),
+      panel.grid.major.y = element_line(size = 0.1, linetype = 'solid',colour = "white"),
+      panel.ontop = TRUE
+      
+      )
+  
+
+p
+```
+
+This is a Pareto chart of the data.
+
+The Pareto chart adds a line that runs from the top of the first bar with subsequent points indicating the cumulative percentage of each bar.
+
+This allows us to immediately see and state that 91% of fatal accidents in the period were caused by the first four categories of motorised vehicles.
+
+The line giving the cumulative percentages is a minor enhancement to the bar plot – but offers major gains in being able to interpret and make statements about contributions of the largest categories to the whole.
+
+The main points to observe in the ggplot code are
+
+Four geoms are used. geom_col is used to represent the bars. geom_line is used to represent the Pareto line. geom_point is used for the grey points on the line. geom_text is used to label the point positions. Note how these geoms have their own aes functions. This overrides the aes settings in the ggplot function. geom_line, geom_point andgeom_text have their own aes function because their y values represent cumulative totals.
+
+By default ggplot would plot the line directly on top of (invisible) points vertically aligned with x-axis breaks. E.g. the line would start at the x value indicated by the value Private Car. However, it is typical for Pareto charts to start at the right most edge of the bar. To achieve that I have had to nudge the (invisible) points underpinning the line using position=position_nudge(x = 0.5, y = 0) As the geom_point and geom_text elements follow the line, I have done the same with their positioning.
+
+
+```{r}
+library(scales)
+
+total_accidents <- sum(fatal_acc_df_cumulative$n)
+
+# plot
+p <- 
+  ggplot(fatal_acc_df_cumulative, aes(x = reorder(vehicle, -n), y = n)) +
+  geom_col(width = 1, fill = "#0571b0", color="white") + 
+  
+  scale_y_continuous(breaks=seq(0,1200, by =100)) + 
+  
+#scale_y_continuous(sec.axis = sec_axis(~(./total_accidents)*100, name = "Percentage")) + 
+  
+  # the pareto line 
+  geom_line(aes(x  = reorder(vehicle, -n), y = cumulative_freq*total_accidents), position=position_nudge(x = 0.5, y = 0), group = 1, col="#ca0020") + # NB: Must use "group = 1"
+  # points on the pareto line 
+  geom_point(aes(x  = reorder(vehicle, -n), y = cumulative_freq*total_accidents), position=position_nudge(x = 0.5, y = 0), size =1, col="grey") +
+  geom_text(aes(x = reorder(vehicle, -n), y = cumulative_freq*total_accidents, label = sprintf("%1.2i%%", round(cumulative_freq*100,0))),  size = 3, nudge_x = 0.4,nudge_y = 80) +
+  
+  labs(x = "", y = "Number of vehicles") +
+  theme(plot.title = element_text(hjust = 0.5),
+      axis.line.y = element_blank(),
+      axis.ticks.y = element_blank(),
+      axis.line.x = element_blank(),
+      axis.ticks.x = element_blank(),
+      axis.text.x = element_text(size = 6, angle = 45, vjust = 1, hjust = 1),
+      panel.background=element_blank(),
+      panel.grid.major.y = element_line(size = 0.1, linetype = 'solid',colour = "white"),
+      panel.ontop = TRUE
+      
+      )
+  
+
+p
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
