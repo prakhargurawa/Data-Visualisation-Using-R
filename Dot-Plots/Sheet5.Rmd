@@ -1,0 +1,270 @@
+---
+title: "Dot plots and Lolliplots"
+output:
+  word_document: default
+  html_document:
+    df_print: paged
+---
+
+## Weaknesses of bars
+
+There are situations where bars don’t work. Y
+There are situations where the values that we want to visualise have very small differences between them. If we visualise them using bar length we will have little sense of the differences between the values.
+
+This is a dataset that I downloaded from athletics Ireland.
+
+The view of the data I want to visualise gives the top 10 Irish female athletes in the hundred meters sprint in 2019.
+
+You can see in the snippet of data on the slides that the running times vary from 11.33 seconds to 11.61 seconds.
+
+Visualising this on a bar chart would look like this:
+```{r}
+library(ggplot2)
+
+ire_100m_2019 <- read.csv("ire-2019-100m-best.csv")
+
+# select the top female 100 m runners in 2019 by time
+ire_100m_2019_f <-ire_100m_2019%>%filter(competition=="Women")%>%top_n(10, wt=-time)
+colnames(ire_100m_2019_f) <- c("rank","time","PB","name","date","competation")
+head(ire_100m_2019_f)
+```
+```{r}
+theme_set(theme_classic())
+
+ggplot(ire_100m_2019_f, (aes(x= reorder(name, -time) , y=time))) + 
+  geom_col( width=0.6, fill = "#0571b0", color="white") +
+  scale_y_continuous(limits = c(0, 12), 
+                     expand = c(0, 0),
+                      breaks = seq(2,12, by = 2), 
+                     #labels = c("50", "100", "150", "200","250", "300", "350" ),
+                     name = "seconds") +
+  
+  ggtitle("2019 100m Women Irish National Performance Best ") +
+  
+  
+
+  coord_flip() +
+    theme(
+      #axis.title.x = element_blank(),
+      axis.line.y = element_blank(),
+      axis.ticks.y = element_blank(),
+      axis.line.x = element_blank(),
+      axis.ticks.x = element_blank(),
+      axis.title.y = element_blank(),
+      plot.title = element_text(size = 11.5),
+      plot.margin = margin(3, 6, 3, 3),
+      panel.background = element_blank(),
+      panel.grid.major.x = element_line(size = 0.4, linetype = 'solid',colour = "white"),
+      panel.ontop = TRUE
+    
+    )
+```
+However, while the next plot tries to address this, it is completely wrong. Remember, the aesthetic to represent quantity is length.
+
+The visual message conveyed by this chart is that Niamh Whelan’s running times are 4 or 5 times faster than Ciara Neville’s – when, in fact,there is a bout 0.5 of a second between them.
+
+You have to refer to the axis to figure this out.
+
+Never truncate a bar.
+
+```{r}
+library(ggplot2)
+
+ire_100m_2019 <- read.csv("ire-2019-100m-best.csv")
+
+# select the top female 100 m runners in 2019 by time
+ire_100m_2019_f <-ire_100m_2019%>%filter(competition=="Women")%>%top_n(10, wt=-time)
+colnames(ire_100m_2019_f) <- c("rank","time","PB","name","date","competation")
+head(ire_100m_2019_f)
+```
+```{r}
+theme_set(theme_classic())
+
+ggplot(ire_100m_2019_f, (aes(x= reorder(name, -time) , y=time))) + 
+  geom_col( width=0.6, fill = "#0571b0", color="white") +
+  scale_y_continuous(limits = c(11.25, 11.75), oob = rescale_none, 
+                     expand = c(0, 0),
+                      #breaks = c( 5e4,  1.0e5,  1.5e5, 2.0e5, 2.5e5,3e5,3.5e5 ),
+                     #labels = c("50", "100", "150", "200","250", "300", "350" ),
+                     name = "seconds") +
+  
+  ggtitle("2019 100m Women Irish National Performance Best ") +
+  
+  
+
+  coord_flip() +
+    theme(
+      #axis.title.x = element_blank(),
+      axis.line.y = element_blank(),
+      axis.ticks.y = element_blank(),
+      axis.line.x = element_blank(),
+      axis.ticks.x = element_blank(),
+      axis.title.y = element_blank(),
+      plot.title = element_text(size = 11.5),
+      plot.margin = margin(3, 6, 3, 3),
+      panel.background = element_blank(),
+      panel.grid.major.x = element_line(size = 0.4, linetype = 'solid',colour = "white"),
+      panel.ontop = TRUE
+    
+    )
+```
+## Dot Plots
+
+Cleveland Dot Plots are dot plots where the dots represent a value associated with a category value. They are an alternative to bar plots. They can reduce visual clutter and can be easier to read. The name comes from the statistician from William Cleveland (1993) Visualizing Data; Hobart Press
+
+Dot plots are useful when all the values fall within a narrow range far from zero
+
+In bar graphs, the length of the bar accurately communicates quantity only if it starts from zero
+
+In dot plots the position of the dot communicates quantity. Therefore, the quantitative scales in dot plots do not need to begin at zero
+
+You can zoom into the range containing the data
+
+The simplest way to create a dot plot is with geom_point()
+```{r}
+ggplot(ire_100m_2019_f, aes(x=time, y = name)) +
+  geom_point()
+```
+However this is not a particular useful plot. Dot plots are often generally ordered by the variable on the x-axis.
+```{r}
+ggplot(ire_100m_2019_f, aes(x=time, y = reorder(name,-time))) +
+  geom_point() +
+  
+  scale_x_continuous(limits = c(11.25, 11.78), 
+                     expand = c(0, 0),
+                      breaks = seq(11.3, 11.7, by = 0.1),
+                     name = "seconds") +
+  
+  theme(axis.title.y = element_blank())
+```
+The problem with this plot is that it is hard to relate each dot to the Athlete’s name on the y-axis.
+
+We will then modify this by adding a custom theme where we make the vertical lines disappear and the horizontal lines become dashed lines
+
+We will also make the dot larger by increasing the size value in geom_point.
+
+This is what is often known as a Cleveland dot plot.
+```{r}
+ggplot(ire_100m_2019_f, aes(x=time, y = reorder(name,-time))) +
+  geom_point(size=2) +
+  scale_x_continuous(limits = c(11.25, 11.78), 
+                     expand = c(0, 0),
+                      breaks = seq(11.3, 11.7, by = 0.1),
+                     name = "seconds") +
+  
+  theme(axis.title.y = element_blank(),
+    panel.grid.major.x =element_blank(),
+    panel.grid.minor.x = element_blank(),
+    panel.grid.major.y = element_line(colour = "grey60", linetype = "dashed", size=0.15))
+```
+## Lolliplots
+
+You may want to order the data within a category
+
+As an example we’ll bring data from the 2019 men’s 100m competition into the plot.
+
+In this case we want to sort first by the competition variable and then by time.
+
+However, the reorder function only will allow ordering by one variable. So we have to use the order function
+
+By default when we create a bar chart ggplot will order the category variable (in this case name) alphabetically; This is because the default factor ordering is alphabetical.
+
+As we did in the last video when ordering the car data by cylinder and then by mpg we create a new factor ordering, for the name *variable). This will then we used by ggplot to order the names on the y-axis
+
+Instead of using the guidelines as before, we will add a new geom type geom_segment which will run from the dot to the y axis
+
+These plots are sometimes called lollipop plots - for obvious reasons.
+
+```{r}
+library(dplyr)
+
+# select the top male and female 100 m runners in 2019 by time
+
+ire_100m_2019_m <-ire_100m_2019%>%filter(competition=="Men")%>%top_n(10, wt=-time)
+
+ire_100m_2019_m_f <-ire_100m_2019_m%>%bind_rows(ire_100m_2019_f)
+
+
+# names sorted by first by competition and then by time
+nameorder <- ire_100m_2019_m_f$name[order(ire_100m_2019_m_f$competition, ire_100m_2019_m_f$time, decreasing = TRUE)]
+
+# Now we turn name into a factor, with levels in the order of name order
+ire_100m_2019_m_f$name <-factor(ire_100m_2019_m_f$name, levels = nameorder)
+
+# Now ggplot will display the names in the order specified by nameorder
+ggplot(ire_100m_2019_m_f, aes(x=time, y =name)) +
+  geom_segment(aes(yend = name), xend = 0, colour="grey60", size=0.15, linetype = "dotted") +
+   geom_point(size = 2.5, aes(colour=competition)) +
+   scale_colour_manual(values= c("#ca0020","#0571b0"), name = "")+
+    scale_x_continuous(limits = c(10.2, 11.82), 
+                     expand = c(0, 0),
+                      breaks = seq(10.4, 11.8, by = 0.2),
+                     name = "seconds") +
+  
+  theme(axis.title.y = element_blank(),
+    panel.grid.major.x = element_line(size=0.02, colour = "grey50"),
+    panel.grid.minor.x = element_blank(),
+    panel.grid.major.y = element_blank(),
+    axis.line.y = element_blank(),
+    axis.line.x = element_blank(),
+    axis.ticks.y = element_blank(),
+    axis.ticks.x = element_blank(),
+      legend.position= c(0.92, 0.95),
+      legend.text = element_text(size = 7), # legend text  was a little large
+      legend.key.size = unit(0.6, "lines"),
+      legend.title = element_blank())# legend keys were a little large
+```
+### Combining multiple points
+
+The power of the dot plot becomes evident when we want to combine and compare multiple points of information.
+
+Consider the case where we want to show running times for the top 10 Irish female athlete in 2019 compared to the 2018 season.
+
+The first work we have to do is to transform the dataframe into long format where we have four columns : name, pb, year and value
+
+Then I order the names by 2019 values in descending order. That is because the intent of the visualisation is to to highlight the 2019 values and use the 2019 values for points of comparison.
+
+```{r}
+ire_100m_2019 <- read.csv("ire-2019-100m-best.csv")
+
+# Select the top 10 male and female runners 
+ire_100m_2019_top_n <-ire_100m_2019%>%group_by(competition)%>%top_n(10, wt=-time)
+
+# names sorted by first by competition and then by time
+# This is the order I want on the axis
+nameorder <- ire_100m_2019_top_n$name[order(ire_100m_2019_top_n$competition, ire_100m_2019_top_n$time, decreasing = TRUE)]
+
+# Now we turn name into a factor, with levels in the order of name order
+# ggplot will display the names in the order indicated by the factor
+ire_100m_2019_top_n$name <-factor(ire_100m_2019_top_n$name, levels = nameorder)
+```
+
+```{r}
+# Now ggplot will display the names in the order specified by nameorder
+ggplot(ire_100m_2019_top_n, aes(x=time, y =name)) +
+  
+  geom_segment(aes(yend = name), xend = 0, colour="grey60", size=0.15, linetype = "dotted") +
+   
+  geom_point(size = 2.5, aes(colour=competition)) +
+  
+  scale_colour_manual(values= c("#ca0020","#0571b0"), name = "") +
+  
+  scale_x_continuous(limits = c(10.2, 11.82), 
+                     expand = c(0, 0),
+                      breaks = seq(10.4, 11.8, by = 0.2),
+                     name = "seconds") +
+  
+  theme(axis.title.y = element_blank(),
+    panel.grid.major.x = element_line(size=0.02, colour = "grey50"),
+    panel.grid.minor.x = element_blank(),
+    panel.grid.major.y = element_blank(),
+    axis.line.y = element_blank(),
+    axis.line.x = element_blank(),
+    axis.ticks.y = element_blank(),
+    axis.ticks.x = element_blank(),
+      legend.position= c(0.92, 0.95),
+      legend.text = element_text(size = 7), # legend text  was a little large
+      legend.key.size = unit(0.6, "lines"),
+      legend.title = element_blank())# legend keys were a little large
+```
+
