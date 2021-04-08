@@ -1,0 +1,491 @@
+---
+title: "Bubble plots"
+output:
+  word_document: default
+  html_notebook: default
+  always_allow_html: true
+---
+
+## Creating a Bubble Plot
+
+A bubble chart is basically a scatterplot with a third numeric variable encoded as point size.
+
+The first plot we will build shows Life Expectancy vs GDP per Capita for the different countries in the data for a single year. The point size will represent the country’s population.
+
+###  Objective: Make bubble plot to examine Life expectancy vs GDP per capita
+
+Using the nations data set, out goal is to plot a bubble chart that illustrates the relationship vs GDP for the different regions of the world. We want also want the plot to illustrate the population of each country. In the second tutorial. We examine the trends over time.
+
+We will produce:
+
+a bubble plot for a given year where each point represents a country and is coloured according to region. In this plot, each point is sized according to population. We want to annotate some of the more extreme values with country names to give the reader some basis for comparison. We also want to pinpoint Ireland.
+We will alos produce a a faceted view of the plot where each facet represents the countries within a given region
+
+#### Loading Data
+
+nations.csv : Data from the World Bank Indicator’s data portal. This data set contains the following fields:
+
+iso2c iso3c Two- and Three-letter codes for each country, assigned by the International Organization for Standardization.
+country Country name.
+year
+population Estimated total population at mid-year, including all residents apart from refugees.
+gdp_percap Gross Domestic Product per capita in current international dollars, corrected for purchasing power in different territories.
+life_expect Life expectancy at birth, in years.
+population Estimated total population at mid-year, including all residents apart from refugees.
+birth_rate Live births during the year per 1,000 people, based on mid-year population estimate.
+neonat_mortal_rate Neonatal mortality rate: babies dying before reaching 28 days of age, per 1,000 live births in a given year.
+region income World Bank regions and income groups, explained here.
+
+#### Load required packages and the data
+
+```{r}
+# load required packages
+library(tidyverse)
+library(ggplot2 )
+library(readr)
+library(dplyr)
+    
+# load disease and democracy data
+nations_data <- read_csv("nations.csv")
+    
+    
+# As I am going to show this in a table
+# I arrange the data in order of country and year
+# The arrange function comes from the dplyr function
+nations_data<-nations_data%>%arrange(country, year)
+
+library(kableExtra)
+kable(head(nations_data, 100), digits = 2, format = "html", row.names = TRUE) %>%
+kable_styling( bootstrap_options = c("striped"),full_width = T,font_size = 10) %>%scroll_box(height = "300px")
+```
+#### Create a subset of the data to plot
+
+To start, we will use the year 2000 as the first date we wish to analyse.
+
+Create a subset of the data set which contains the data for the year 2000
+
+```{r}
+nations_2000<- subset(nations_data, year==2000)
+p <-ggplot(nations_2000, aes(x=gdp_percap, y=life_expect))
+p <-p+ geom_point()
+p
+```
+
+```{r}
+p <- ggplot(nations_2000, aes(x=gdp_percap, y=life_expect, size=population, color=region))
+p + geom_point() 
+```
+
+#### Identify the featuresyou need to fix/adjust with the basic plot
+
+We can see that there are several features we need to improve
+
+Fix the missing data messages
+
+chart title
+
+axis labels
+
+axis scale
+
+overlap
+
+colour
+
+point area scale
+
+legend - use non scientific notation
+
+annotated labels
+
+Grid layout
+
+#### Fix the missing data messages
+
+By setting na.rm=TRUE the function skips over the rows with missing values (NA) from the analysis
+
+```{r}
+p + geom_point(na.rm = TRUE) 
+```
+#### Add the chart title
+```{r}
+p + geom_point(na.rm = TRUE) + 
+ggtitle("Life Expectancy vs GDP per Capita year 2000") # adds a title
+```
+
+####  Format the axis labels
+
+```{r}
+p + geom_point(na.rm = TRUE) + 
+ggtitle("Life Expectancy vs GDP per Capita year 2000") + 
+xlab("GDP per Capita") + # labels the x-axis
+ylab("Life Expectancy") # labels the y-axis
+```
+
+#### Axis scale
+Since many countries have a low GDP compared to the richest few countries, many of the data points are bunched up on the left of the chart. The scale_x_log10() function creates a log scale on the x-axis, which allows us to spread the data more evenly across the chart.
+```{r}
+p + geom_point(na.rm = TRUE) + 
+ggtitle("Life Expectancy vs GDP per Capita year 2000") + 
+xlab("GDP per Capita") + 
+ylab("Life Expectancy") +
+scale_x_log10() # provides an x-axis in log scale
+```
+
+You may prefer to show the x-axis values in log 10 format. To do that you can specify the label format using trans_format function. Look up the R documentation for more information on this function
+
+At the point you can decide the upper and lower limits of the x-axis. If you omit this, R will decide these for you. However, there may be cases when you want to show the full extent of the x and y axes.
+
+This can be done using the xlim and ylim functions, but when you are using scale_x_log10 to scale the axis, you specify the axis limits as an argument to this function
+
+```{r}
+library(scales)
+
+p + geom_point(na.rm = TRUE) + 
+ggtitle("Life Expectancy vs GDP per Capita year 2000") + # adds a title
+xlab("GDP per Capita") + 
+ylab("Life Expectancy") +
+scale_x_log10(labels = trans_format("log10", math_format(10^.x)), limits = c(400,1e5))
+```
+#### Colour and overlap
+
+There are two issues we should deal with here
+
+There is a lot of overlap between points. In this situation, we should show some degree of transparency so it is clear where points overlap
+
+The default colour allocation is somewhat gaudy, so we should choose a more appropriate palette suited to the categorical data of the region field
+
+Firstly, setting transparency using the alpha field of geompoint
+
+```{r}
+p + geom_point(na.rm = TRUE, alpha=0.5) + # alpha (transparency) set to 0.5
+ggtitle("Life Expectancy vs GDP per Capita year 2000") + 
+xlab("GDP per Capita") + 
+ylab("Life Expectancy") +
+scale_x_log10(labels = trans_format("log10", math_format(10^.x)), limits = c(400,1e5))
+```
+
+```{r}
+### Load the RcolorBrewer package or install if not present
+##if (!require("RColorBrewer")) {
+#install.packages("RColorBrewer")
+#}
+
+library(RColorBrewer)
+```
+
+RColorBrewer library has 3 groups of palettes
+
+Sequential : Sequential palettes are suited to ordered data that progress from low to high. Lightness steps dominate the look of these schemes, with light colors for low data values to dark colors for high data values.
+Qualitative : do not imply magnitude differences between legend classes, and hues are used to create the maximum visual differences between classes. Qualitative schemes are best suited to representing nominal or categorical data.
+Diverging : Diverging palettes put equal emphasis on mid-range critical values and extremes at both ends of the data range. The critical class or break in the middle of the legend is emphasized with light colors and low and high extremes are emphasized with dark colors that have contrasting hues. In short, Light colours for mid-range data, low and high contrasting dark colours
+You can view the 3 groups by calling the following function
+
+```{r}
+display.brewer.all()
+```
+As we are colouring the data points by region, which is a categorical variable, we should select one of the qualitative palettes. My preference is for “dark2”, which has 8 colours - which is a good fit for the set of values (7) of the region variable
+```{r}
+display.brewer.all(type="qual") # just displays the qualitative palettes
+```
+
+```{r}
+display.brewer.pal(7,"Dark2") # displays the Dark2 palette for 7 colours
+```
+
+We now add this palette to our plot.
+
+The scale_color_brewer function overides the default colour mapping of ggplot, imposing the specified Brwer palette Dark2.
+
+You could of course specify your own palette of colours and use the function scale_color_manual to overide the default colour mapping produced by ggplot.
+
+```{r}
+p + geom_point(na.rm = TRUE, alpha=0.5) + 
+ggtitle("Life Expectancy vs GDP per Capita year 2000") + 
+xlab("GDP per Capita") + 
+ylab("Life Expectancy") +
+scale_x_log10(labels = trans_format("log10", math_format(10^.x)), limits = c(400,1e5)) +
+scale_color_brewer(palette='Dark2') # this sets the colour palette to 'Dark2'
+```
+#### Refining Point Area
+
+Recall that at the start we mapped the size of the point to the population size. This is an aesthetic mapping and was specified in the aes function within the ggplot function.
+
+However, the default area of the data points does not visually reflect the comparative population sizes of various countries. As such we will use scale_size_area to override the default scaling imposed by ggplot when we mapped the size of the point to the population size.
+
+This function can takemax_size and labels attributes. max_size indicates the maximum area size of the largest data point. The smaller data points are scaled from this maximum value.
+
+Selecting the max_size value is something you will do by trial and error.
+
+The labels attribute refers to the numeric labels of the legend. Currently, it is displaying numbers in scientific notation. For a more general audience, we set this to show numbers where units are seperated by commas.
+
+
+```{r}
+p + geom_point(na.rm = TRUE, alpha=0.5) + 
+ggtitle("Life Expectancy vs GDP per Capita year 2000") + 
+xlab("GDP per Capita") + 
+ylab("Life Expectancy") +
+scale_x_log10(labels = trans_format("log10", math_format(10^.x)), limits = c(400,1e5)) +
+scale_color_brewer(palette='Dark2') + 
+scale_size_area(max_size=12, labels = comma) # override the size mapping of points and modify how legend shows numbers associated with size
+```
+
+
+#### Labelling Data points
+
+Examine the current state of the chart. What information does it communicate?
+
+The most dramatic piece of information is the link between low life expectancy and low GDP for countries in Sub-Saharan Africa.
+
+We can see relatively high life expectancy for countries in North America and East Asia - but which countries?
+
+We can label countries using the geom_text function and specifying the value to display for each data point, as well as its size, and vertical and horizontal offset from the point. In this case, we want the label to display the value of the country feature for each point
+
+```{r}
+p + geom_point(na.rm = TRUE, alpha=0.5) + 
+ggtitle("Life Expectancy vs GDP per Capita year 2000") + 
+xlab("GDP per Capita") + 
+ylab("Life Expectancy") +
+scale_x_log10(labels = trans_format("log10", math_format(10^.x)), limits = c(400,1e5)) +
+scale_color_brewer(palette='Dark2') + 
+scale_size_area(max_size=12, labels  = comma) + 
+geom_text(aes(label=country), size = 2,na.rm = TRUE) 
+```
+
+#### What labels should you display?
+
+This depends entirely on your audience - and their objectives in reading information from a data plot.
+
+A group of senior economists at the world bank will have different requirements than the readers of a daily news paper.
+
+In any case, the message is that we cannot label everything point on the plot. We need to label those points that help orient the reader toward the key pieces of information being communicated.
+
+We need to use our knowledge of the domain to make those labelling decisions.
+
+
+Method 1:
+
+Manual annotation by specifying the precise location of a label using the x,y coordinate values from the plot. This gives you precise control over the location of each label but it is not very scalable.
+
+For this example we will label two countries of interest - India and Pakistan. To do that, we get the life_expect, gdp_percap values for each country
+
+```{r}
+# just display the life_expect, gdp_percap values for the two countries of interest
+nations_2000[nations_2000$country=='India' | nations_2000$country=='Pakistan', c('country', 'life_expect', 'gdp_percap' ) ]
+```
+To demonstrate this approach, I will first annotate the plot using the annotate function.
+
+Note how the x,y coodinate values are based on the scales of the x and y axis.
+```{r}
+p + geom_point(na.rm = TRUE, alpha=0.5) + 
+ggtitle("Life Expectancy vs GDP per Capita year 2000") + 
+xlab("GDP per Capita") + 
+ylab("Life Expectancy") +
+scale_x_log10(labels = trans_format("log10", math_format(10^.x)), limits = c(400,1e5)) +
+scale_color_brewer(palette='Dark2') + 
+scale_size_area(max_size=15, labels  = comma) +
+  
+annotate("text", x=1850, y= 63, label="India") + # positioning by trial and error
+annotate("text", x=4000, y= 62.5 , label="Pakistan")  # positioning by trial and error
+```
+#### How to selectively display labels
+
+Method 2
+
+Use a function to define the most interesting data points and display only labels for these data points. Using this method, you can define the values that may be of interest to your audience
+
+For this plot, I am going to define the following criteria of ‘interestingness’ :
+
+population >120000000
+life_expect < 44
+gdp_percap < 450
+country ==Ireland
+The more criteria you add or the wider your criteria, the more labels you will include - and you may lose readability. Defining criteria is based on an understanding of the domain and the constraints of the visualisation. It requires some trial and error.
+
+We can use an ifelse statement to encode these rules. We create a new field in the data set called label_country which we populate with the country names that fulfil the rule criteria. The countries that do not fulfill the criteria will have this field set to NA.
+
+We then map this field to the plot using geom_text. This is an aesthetic mapping. Text will be displayed where the field value is not NA.
+
+We need to tell the geom_text to skip the NA values. This is done, as before, with na.rm = TRUE
+
+Note that this is an example of using a local aesthetic mapping within the body of the geometric, in this case geom_text.
+
+
+```{r}
+# Creating a new field populated with only the country names we are interested in
+nations_2000$label_country <- ifelse(nations_2000$population > 120000000  | nations_2000$life_expect < 44 | nations_2000$gdp_percap < 450| nations_2000$country=="Ireland", nations_2000$country, NA)
+```
+
+```{r}
+p + geom_point(na.rm = TRUE, alpha=0.5) + 
+ggtitle("Life Expectancy vs GDP per Capita year 2000") + 
+xlab("GDP per Capita") + 
+ylab("Life Expectancy") +
+  
+scale_x_log10(labels = trans_format("log10", math_format(10^.x)), limits = c(400,1e5)) +
+  
+scale_color_brewer(palette='Dark2') + 
+  
+scale_size_area(max_size=12, labels  = comma) + 
+  
+#Using geom_text to add text labels  
+geom_text(data= nations_2000,aes(label=label_country), vjust=-0.5, size=2, na.rm = TRUE, show.legend = FALSE) 
+```
+Note the additional attributes used in geom_text
+
+vjust refers the vertical offset of the label;
+x refers to its x postioning. If the x-axis were scaled uniformly, the x position of the label would be the x position of the data point +/- a number (e.g x = gdp_percap + 55 )). However, as the axis hasa log scale, the x offset has to be based on a multiplicative function
+size the font size of the label
+na.rm = TRUE the standard command to skip rows with missing values
+show.legend = FALSE unless we include this, another legend based on the text labels will be overlaid on the color legend. By default in ggplot, any aesthetic mapping will show up as a legend element. Often we don’t need to show them.
+Note that this automated approach to label generation has problems. You do not have full control over where the labels will be placed - and in this case, you can see that the labels for India and Pakistan clash. However, the benefit is that you can easily run this plot script for different years of analysis and quickly produce a series of labelled plots for comparison purposes.
+
+
+
+#### Using Labels
+
+The user of geom_label is an alternative labelling solution to geom_text. By default each label is enclosed in a label area.
+
+```{r}
+p + geom_point(na.rm = TRUE, alpha=0.5) + 
+ggtitle("Life Expectancy vs GDP per Capita year 2000") + 
+xlab("GDP per Capita") + 
+ylab("Life Expectancy") +
+  
+scale_x_log10(labels = trans_format("log10", math_format(10^.x)), limits = c(400,1e5)) +
+  
+scale_color_brewer(palette='Dark2') + 
+  
+scale_size_area(max_size=12, labels  = comma) + 
+  
+#Using geom_text to add text labels  
+geom_label(data= nations_2000,aes(label=label_country), size= 2,  label.padding = unit(0.1, "lines"), label.r = unit(0.15, "lines"), colour="black", alpha=0.4, na.rm = TRUE, show.legend = FALSE) 
+```
+
+#### Using Labels that repel each other
+
+We can allow ggplot solve this by using the ggrepel library and the geom_label_repel or geom_text_repel functions.
+
+geom_label_repel will add a line between the label and the point according to the value of the min.segment.length attribute.
+
+If you set this value to be zero, then it will add a line between each point and its label.
+
+```{r}
+library(ggrepel)
+
+p + geom_point(na.rm = TRUE, alpha=0.5) + 
+ggtitle("Life Expectancy vs GDP per Capita year 2000") + 
+xlab("GDP per Capita") + 
+ylab("Life Expectancy") +
+  
+scale_x_log10(labels = trans_format("log10", math_format(10^.x)), limits = c(400,1e5)) +
+  
+scale_color_brewer(palette='Dark2') + 
+  
+scale_size_area(max_size=12, labels  = comma) + 
+  
+  
+#Using geom_text to add text labels  
+geom_label_repel(data= nations_2000,aes(label=label_country), min.segment.length = unit(0, 'lines'), size= 2,  label.padding = unit(0.1, "lines"), label.r = unit(0.15, "lines"), colour="black", alpha=0.7, na.rm = TRUE, show.legend = FALSE) 
+```
+The final step in this visualisation are minor tweaks
+
+Change the default ‘grey’ theme using a theme
+Increase the size of the points of the colour legend using the guides function
+
+
+```{r}
+library(ggrepel)
+
+pp<-p + geom_point(na.rm = TRUE, alpha=0.5) + 
+ggtitle("Life Expectancy vs GDP per Capita year 2000") + 
+xlab("GDP per Capita") + 
+ylab("Life Expectancy") +
+  
+scale_x_log10(labels = trans_format("log10", math_format(10^.x)), limits = c(400,1e5)) +
+  
+scale_y_continuous(breaks=c(20,30,40,50,60,70,80,90), limits=c(35,85), expand=c(0,0)) +
+  
+scale_color_brewer(palette='Dark2') + 
+  
+scale_size_area(max_size=12, labels  = comma) + 
+  
+  
+#Using geom_text to add text labels  
+geom_label_repel(data= nations_2000,aes(label=label_country), size= 2, min.segment.length = unit(0.0, 'lines'), segment.size = 0.25,    label.padding = unit(0.1, "lines"), label.r = unit(0.15, "lines"), colour="black", alpha=0.8, na.rm = TRUE, show.legend = FALSE)+
+
+
+theme_minimal(base_size = 10) +
+  
+  theme(panel.grid.minor =  element_blank() ) + 
+  # increase the size of the legend colour points
+guides(colour = guide_legend(override.aes = list(size = 5))) 
+
+pp
+```
+Finally, if we want to seperate each region into its own panel, we can do so with the faceting facility of ggplot.
+
+I use the facet_wrap function specifying region as the variable to facet on. This splits the plot into several panels, one for each region.
+
+I have kept the colour scheme though it is not necessary - because the panels have segregated the data by region. However, I have suppred the colour legend which is redundant. I have done this within the scale_colour_brewer function by setting guide=FALSE. A guide in ggplot is another name for a legend.
+
+```{r}
+library(ggrepel)
+
+pp_facet<-p + geom_point(na.rm = TRUE, alpha=0.5) + 
+ggtitle("Life Expectancy vs GDP per Capita year 2000") + 
+xlab("GDP per Capita") + 
+ylab("Life Expectancy") +
+  
+scale_x_log10(labels = trans_format("log10", math_format(10^.x)), limits = c(400,1e5)) +
+  
+scale_y_continuous(breaks=c(20,30,40,50,60,70,80,90), limits=c(35,85), expand=c(0,0)) +
+  
+scale_color_brewer(palette='Dark2', guide=FALSE) + 
+  
+scale_size_area(max_size=6, labels  = comma) +
+  
+  #Using geom_text to add text labels  
+geom_label_repel(data= nations_2000,aes(label=label_country), size= 1.5, min.segment.length = unit(0.0, 'lines'), segment.size = 0.25,    label.padding = unit(0.1, "lines"), label.r = unit(0.15, "lines"), colour="black", alpha=0.8, na.rm = TRUE, show.legend = FALSE) +
+
+theme_minimal(base_size = 10) +
+  
+  theme(panel.grid.major = element_line(size=0.2),
+            panel.grid.minor = element_line(size=0.1)) + 
+
+facet_wrap(vars(region))
+
+pp_facet
+```
+```{r}
+library(ggrepel)
+
+pp_facet<-p + 
+  
+  geom_point(na.rm = TRUE, alpha=0.6, colour="darkgrey") + 
+ggtitle("Life Expectancy vs GDP per Capita year 2000") + 
+xlab("GDP per Capita") + 
+ylab("Life Expectancy") +
+  
+scale_x_log10(labels = trans_format("log10", math_format(10^.x)), limits = c(400,1e5)) +
+  
+scale_y_continuous(breaks=c(20,30,40,50,60,70,80,90), limits=c(35,85), expand=c(0,0)) +
+  
+#scale_color_brewer(palette='Dark2', guide=FALSE) + 
+  
+scale_size_area(max_size=6, labels  = comma) +
+  
+    #Using geom_text to add text labels  
+geom_label_repel(data= nations_2000,aes(label=label_country), size= 1.5, min.segment.length = unit(0.0, 'lines'), segment.size = 0.25,    label.padding = unit(0.1, "lines"), label.r = unit(0.15, "lines"), colour="black", alpha=0.8, na.rm = TRUE, show.legend = FALSE) +
+
+theme_minimal(base_size = 10) +
+  
+  theme(panel.grid.major = element_line(size=0.2),
+            panel.grid.minor = element_line(size=0.1)) + 
+
+facet_wrap(vars(region))
+
+pp_facet
+```
+
+
