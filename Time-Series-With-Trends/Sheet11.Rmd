@@ -1,0 +1,215 @@
+---
+title: " Visualising Trends"
+output: html_notebook
+---
+
+## Representing Trends
+
+Often we are more interested in the overarching trend of the data than in the specific detail of where each individual data point lies.
+
+By drawing the trend on top of or instead of the actual data points, usually in the form of a straight or curved line, we can create a visualization that helps the reader immediately see key features of the data.
+
+```{r}
+library(tidyverse)
+library(lubridate)
+
+
+iseq_all <- read_csv("ISEQ All Share_quote_chart.csv") %>%
+  mutate(
+    date = as.Date(dmy_hm(time)),
+    close= `ISEQ All Share`
+  ) %>%
+  select(date,close )
+```
+Daily closing values of the ISEQ for the year up to Wednesday, February 26th, 2020.
+Data source : https://live.euronext.com/
+```{r}
+startdate<-"31-12-2018"
+enddate<-"26-02-2020"
+
+iseq_all_1920<- iseq_all %>% filter(date > dmy(startdate) & date <= dmy(enddate)) 
+  
+  ggplot(iseq_all_1920, aes(date, close)) + 
+  geom_line(color = "grey20", size = .5) + 
+  scale_x_date(limits = c(dmy(startdate), dmy(enddate)), expand = c(0, 0), date_breaks = "2 month", date_labels="%b %y") +
+  xlab(NULL) + ylab("ISEQ Closing Prices") +
+  theme_minimal()+
+  theme(
+    plot.margin = margin(3, 12, 3, 1.5),
+    panel.grid.minor.x = element_blank(),
+    panel.grid.minor.y = element_blank()
+    
+  )
+```
+
+## Moving Average
+
+Smoothing produces a function that captures key patterns in the data while removing irrelevant minor detail or noise.
+
+To generate a moving average, we take a time window, say the first 20 days in the time series, calculate the average price over these 20 days, then move the time window by one day, so it now spans the 2nd to 21st day, move the time window again, and so on.
+
+To plot this sequence of moving averages, we need to decide which specific time point to associate with the average for each time window.
+
+We can plot the average at the center of the time window, which results in a curve that overlays perfectly on the original data
+
+```{r}
+library(knitr)
+library(kableExtra)
+library(e1071)
+
+source("moving_ave.R", echo = T)
+```
+```{r}
+iseq_all_1920_mov_ave <- iseq_all %>%  filter(date > dmy(startdate) & date <= dmy(enddate)) %>% 
+  mutate(
+    close_20d_ave = moving_ave(date, close, 20, center = TRUE),
+    close_50d_ave = moving_ave(date, close, 50, center = TRUE),
+    close_100d_ave = moving_ave(date, close, 100, center = TRUE)
+  )
+
+
+# kurtosis values for orginal data vs smoothed data
+
+k0<-kurtosis(iseq_all_1920_mov_ave$close) 
+k20<-kurtosis(iseq_all_1920_mov_ave$close_20d_ave, na.rm=TRUE) 
+k50<-kurtosis(iseq_all_1920_mov_ave$close_50d_ave,na.rm=TRUE) 
+k100<-kurtosis(iseq_all_1920_mov_ave$close_100d_ave,na.rm=TRUE) 
+
+k<- data.frame("win" = c(0,20,50,100), "kurtosis" = c(k0,k20,k50,k100))
+
+
+kable(k) %>%
+  kable_styling( full_width = F)
+```
+```{r}
+ggplot(iseq_all_1920_mov_ave, aes(date, close)) + 
+  geom_line(color = "grey20", size = .25) +
+  geom_line(aes(date, close_20d_ave, color = "20d"), size = 1, na.rm = TRUE) +
+  geom_line(aes(date, close_50d_ave, color = "50d"), size = 1, na.rm = TRUE) +
+  geom_line(aes(date, close_100d_ave, color = "100d"), size = 1, na.rm = TRUE) +
+  scale_color_manual(
+    values = c(
+      `20d` = "#009e73",
+      `50d` = "#d55e00",
+      `100d` = "#0072b2"
+    ),
+    breaks = c("20d", "50d", "100d"),
+    labels = c("20-day average", "50-day average", "100-day average"),
+    name = NULL
+  ) + 
+  scale_x_date(limits = c(dmy(startdate), dmy(enddate)), expand = c(0, 0), date_breaks = "2 month", date_labels="%b %y") +
+  xlab(NULL) + ylab("ISEQ Closing Prices") +
+ theme_minimal()+
+  theme(
+    plot.margin = margin(3, 12, 3, 1.5),
+    panel.grid.minor.x = element_blank(),
+    panel.grid.minor.y = element_blank(),
+    legend.position = c(0.2,0.85)
+  )
+```
+The moving average is the most simplistic approach to smoothing, and it has some obvious limitations. First, it results in a smoothed curve that is shorter than the original curve Parts are missing at either the beginning or the end or both.
+
+Second, even with a large averaging window, a moving average is not necessarily that smooth.
+
+
+##  Loess Smoother
+
+One widely used method is LOESS (locally estimated scatterplot smoothing, W. S. Cleveland (1979)), which fits low-degree polynomials to subsets of the data.
+
+```{r}
+loess_span1 = 0.2
+loess_span2 = 0.8
+
+iseq_all_1920 %>%
+  mutate(
+    close_50d_ave = moving_ave(date, close, 50)
+  ) %>%
+  ggplot(aes(date, close)) + 
+  geom_line(color = "grey20", size = .25) +
+  geom_line(aes(date, close_50d_ave, color = "100d"), size = 1, na.rm = TRUE) +
+  
+  geom_smooth(aes(color = "smooth1"), method="loess", span= loess_span1, size = 1, na.rm = TRUE, se = FALSE) +
+  
+  geom_smooth(aes(color = "smooth2"), method="loess", span= loess_span2, size = 1, na.rm = TRUE, se = FALSE) +
+  
+  scale_color_manual(
+    values = c(
+      `100d` = "#d55e00",
+      smooth1 = "#0072b2",
+      smooth2 = "#009E73"
+    ),
+    breaks = c("smooth1", "smooth2", "100d"),
+    labels = c(paste0("LOESS, span=", loess_span1),paste0("LOESS, span=", loess_span2), "50-day average"),
+    name = NULL
+  ) + 
+   scale_x_date(limits = c(dmy(startdate), dmy(enddate)), expand = c(0, 0), date_breaks = "2 month", date_labels="%b %y") +
+  xlab(NULL) + ylab("ISEQ Closing Prices") +
+  theme_minimal()+
+  theme(
+    
+    legend.justification = c(1, 0.5),
+    legend.box.background = element_rect(fill = "white", color = NA),
+    legend.box.margin = margin(0, 12, 6, 12),
+    plot.margin = margin(3, 12, 3, 1.5),
+    panel.grid.minor.x = element_blank(),
+    panel.grid.minor.y = element_blank(),
+    legend.position = c(0.35,0.85)
+  )
+```
+
+## 4 Irish Tech Stocks
+
+Lets look at stock prices for 4 successful Irish companies trading on the Irish stock market
+```{r}
+# assuming company is ordered alphabetically
+company.colours<- c("firebrick4", "#009E73", "#E69F00",  "#56B4E9")
+
+iseq_4companies <- read_csv("IRE_ISEQ_Companies.csv") %>%
+  mutate(
+    date = as.Date(dmy_hm(time)),
+    close= Close,
+    company = Company
+  ) %>%
+  select(date,company, close )
+```
+```{r}
+lastdate<-max(iseq_4companies$date)
+
+iseq_4companies_final <- filter(iseq_4companies, date == lastdate)
+
+# if you are colouring the axis text, the colurts need to be in the same order that the labels appeat on the axis
+axis.color.order <- company.colours[order(iseq_4companies_final$close)]
+  
+  ggplot(iseq_4companies, aes(date, close, colour = company)) + 
+  geom_line( size = .5, alpha= 0.6) + 
+  geom_smooth(aes(group = company), colour = "black", alpha = 0.2, method="loess", span= 0.20, size = 0.4, na.rm = TRUE, se = FALSE) +
+  
+  scale_color_manual(values=company.colours,
+                     name="",
+                     breaks=c("AIB", "APPLEGREEN", "GLANBIA", "RYANAIR"),
+                     labels=c("AIB", "Applegreen", "Glanbia", "Ryanair")) +
+    
+    scale_y_continuous(name="ISEQ closing share prices",
+                     limits = c(0, 20),
+                     expand=c(0,0),
+                sec.axis = dup_axis(
+                breaks = iseq_4companies_final$close,
+                labels = iseq_4companies_final$company,
+                name = NULL)) + 
+    
+  scale_x_date(limits = c(dmy(startdate), dmy(enddate)), date_breaks = "2 month", date_labels="%b %y", expand=c(0,0)) +
+  
+  
+  theme_minimal()+
+  theme(
+    legend.position = "None",
+    plot.margin = margin(3, 12, 3, 1.5),
+     axis.line.y.right = element_blank(),
+        axis.ticks.y.right = element_blank(),
+        axis.text.y.right = element_text(margin = margin(0, 0, 0, 0) ,size = 8, colour = axis.color.order)
+    
+
+    
+  )
+```
+
