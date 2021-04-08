@@ -9,6 +9,8 @@
 
 ![alt text](https://github.com/prakhargurawa/Data-Visualisation-Using-R/blob/main/Images/dasa.png?raw=true)
 
+![alt text](https://github.com/prakhargurawa/Data-Visualisation-Using-R/blob/main/Images/unnamed-chunk-9-1.png?raw=true)
+
 ![alt text](https://github.com/prakhargurawa/Data-Visualisation-Using-R/blob/main/Images/cvb.png?raw=true)
 
 ![alt text](https://github.com/prakhargurawa/Data-Visualisation-Using-R/blob/main/Images/az.png?raw=true)
