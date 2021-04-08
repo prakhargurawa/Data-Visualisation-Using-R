@@ -1,6 +1,8 @@
 # Data-Visualisation-Using-R
 
 ### Few sample ouputs
+![alt text](https://github.com/prakhargurawa/Data-Visualisation-Using-R/blob/main/Images/UK.png?raw=true)
+
 ![alt text](https://github.com/prakhargurawa/Data-Visualisation-Using-R/blob/main/Images/saz.png?raw=true)
 
 ![alt text](https://github.com/prakhargurawa/Data-Visualisation-Using-R/blob/main/Images/vbn.png?raw=true)
