@@ -1,0 +1,408 @@
+---
+title: "UK Election Polls Case Study"
+output:
+  word_document: default
+  html_notebook: default
+---
+## UK Election Polls Case Study
+
+Dataset: https://www.theguardian.com/profile/levitt-daniel
+
+```{r}
+library(readr)
+library(ggplot2)
+library(dplyr)
+library(tidyr)
+library(lubridate)
+library(scales)
+library(kableExtra)
+
+ukpoll <- read_csv("UKPoll-2020-continuous-series-1.csv")
+
+kable(ukpoll,
+      digits = 2,
+      format = "html",
+      row.names = TRUE) %>%
+  kable_styling(
+    bootstrap_options = c("striped"),
+    full_width = F,
+    font_size = 12
+  ) %>%
+  column_spec(column = 3, width = "8em") %>%
+  scroll_box(height = "400px")
+```
+## Transform the data to long format
+
+We need to Transform the data from wide format to long format.
+
+Making the party variable into an ordered factor allows me to control the order that the party will be ordered in the legend.
+
+The data set contains polling data going back to 2017. We’ll examine data for 2019.
+
+```{r}
+#Transform the data from wide format to long format.
+ukpoll %>% gather(party, rating, con:oth) -> ukpoll_long
+
+#Make the *party* variable into an ordered factor
+ukpoll_long$party <-
+  factor(ukpoll_long$party,
+         levels = c('con', 'lab', 'ldem', 'grn', 'brx', 'oth'))
+
+# selecting data for 2019 only
+ukpoll_long_2019 <-
+  ukpoll_long %>% mutate(date = as.Date(date, format = "%d/%m/%Y")) %>% filter(date >= as.Date("01/01/2019", format = "%d/%m/%Y"))
+```
+
+## Calculate daily mean poll scores
+
+As there are several polls presenting figures for the same day, I calculate an unweighted mean of their scores - so that each party will have a single score per day.
+
+I will use the means as the data points on which to plot the loess smoothing curve.
+
+```{r}
+# as there are some times several polls on the same day, I calculate an unweighted mean
+ukpoll_long_2019_daily_mean<-ukpoll_long_2019 %>%
+  group_by(date,party)%>%
+  summarise(meanrating = mean(rating))
+```
+
+## Make a basic plot
+
+I’ll make a basic plot laying out the data points and colouring by party.
+
+I’ll set the alpha value low as we will have quite a bit of overplotting
+
+```{r}
+g <-
+  ggplot(data = ukpoll_long_2019, aes(x = date, y = rating, colour = party)) +
+  geom_point(alpha = 0.2,
+             size = 1,
+             na.rm = TRUE) +
+  theme_minimal()
+
+g
+```
+## Add a smoothing line
+
+The distribution of point colouration suggests several trends but nothing is very clear.
+
+Now, I will superimpose a loess smoothing trend line on top of these points using geom_smooth
+
+The data I use for the smoother is the daily mean data that I calculated calculated above. Notice how you can give a geometric its own data set and aesthetic mappings.
+
+I’ve told ggplot that the aesthetic (aes) for this geometric should not inherit the global aesthetic mapping defined in the ggplot function - inherit.aes = FALSE
+
+```{r}
+g <-
+  g + geom_smooth(
+    data = ukpoll_long_2019_daily_mean,
+    aes(x = date, y = meanrating, color = party),
+    method = "loess",
+    span = 0.2,
+    size = 0.9,
+    na.rm = TRUE,
+    se = FALSE,
+    inherit.aes = FALSE
+  )
+
+g
+```
+
+You can see how in a few lines of code the trends in this data set can be outlined.
+
+If this graph is part of exploratory analysis for our own consumption, we may not need to go much further. It gives us the main trends in the data.
+
+However, there are a still a several things to do before graph is ready to present or publish to other people.
+
+## Further steps
+
+customise the party colour allocations
+customise the x axis breaks so that they are more frequent and show months only (year not needed)
+customise y axis title to “percentage”; remove x axis title.
+move the legend to the top and make it horizontal
+customise legend so it shows long form of part names
+customise gridlines, showing the very minimum needed
+add vertical lines indicating events of interest - Theresa May;s resignation, Boris Johnson’s appointment as PM, Election day
+add highlight of party polling scores on the eve of the election
+
+### Customise colour allocation
+
+Let’s first customise the party colour allocations to more appropriate colours. We use the scale_colour_manual to do that. At the same time, we can customise the labels associated with these colours by setting the label attribute to a vector of party long names. Setting he name attribute to NULL tells ggplot not to show the name of the variable represented by the colours.
+
+```{r}
+party.colours <-
+  c(
+    'con' = '#1f78b4',
+    'lab' = '#e31a1c',
+    'ldem' = '#ff7f00',
+    'brx' = '#cab2d6',
+    'grn' = '#33a02c',
+    'oth' = 'darkgrey'
+  )
+
+g <- g +
+  scale_colour_manual(
+    values = party.colours,
+    labels = c(
+      "Conservatives",
+      "Labour",
+      "Lib Dem",
+      "Green",
+      "Brexit",
+      "Others"
+    ),
+    name = NULL
+  )
+
+g
+```
+
+### Customise the x-axis
+
+Next we’ll customise the x-axis breaks so that they are more frequent and show months only (year not needed).
+
+As the x-axis has date values, we have to use the scale_x_date function to override the ggplot defaults. This function has a special way of setting breaks. You simply specify the break interval you want in the form 1 month, 2 month, 1 year, 2 week, etc
+
+We specify the data_format as %b , which represents the short format of a month. You can see examples of different date formats available here : https://www.rdocumentation.org/packages/ggplot2/versions/1.0.1/topics/scale_x_date
+
+Frankly, I find the expand attribute hard to explain. It’s associated with the scale_x_ and scale_y_. In general, setting its value to c(0,0) tightens the plot so that there is no distance between the plot and the axis in question. However, the function that controls how the values in the vector control the distance are somewhat arcane - and I tweak these values on a trial and error basis.
+
+
+
+```{r}
+g <- g +
+  scale_x_date(
+    name = NULL,
+    breaks = "1 month",
+    labels = date_format("%b"),
+    expand = c(0.01, 0)
+  )
+
+g
+```
+### Customise the y-axis
+
+We’ll customise the y-axis. The main addition of interest here is the removal of the axis title, name = NULL. Instead of changing the title to percentage, I’ve directly labelled the values as percentages
+
+```{r}
+g <- g +
+  scale_y_continuous(
+    limits = c(0, 51),
+    breaks = seq(0, 40, by = 10),
+    name = NULL,
+    labels = paste0(seq(0, 40, by = 10), "%") ,
+    expand = c(0.01, 0)
+  )
+
+g
+```
+
+### Customise the legend
+
+```{r}
+g <- g +
+  theme(
+    legend.text = element_text(size = 8),
+    legend.title = element_blank(),
+    legend.position = c(0.3, 0.99), # move to the top
+    legend.direction = "horizontal", # make it horizontal
+    legend.key.size = unit(0.9, "line"),
+    legend.spacing.x = unit(0.1, 'cm'),
+    legend.background = element_rect(
+      fill = "white",
+      size = 0.5,
+      colour = "white"
+    )
+  )
+
+g
+```
+While we’ve specified that the legend be horizontal, ggplot will wrap it into a second row by default. To override this we need to call upon the guides function. This is somewhat non-intuitive.
+
+```{r}
+g <- g + guides(colour = guide_legend(nrow = 1))
+
+g
+```
+### Customise the gridlines
+
+We’ll customise gridlines, showing the very minimum needed. I think we just need very light gridlines representing the break values on the y-axis. These are the major y gridlines. As I’ve already removed the x-axis gridlines, I’ll replace the x-axis ticks so the reader knows more precisely the point on the axis indicated by the month values
+
+Note how you can add simply another theme function with an additional customisation - this time for the gridlines
+```{r}
+g <- g +
+  theme(
+    panel.grid.minor.y = element_blank(),
+    panel.grid.major.x = element_blank(),
+    panel.grid.minor.x = element_blank(),
+    panel.grid.major.y = element_line(size = 0.2),
+    axis.ticks.x = element_line(size = 0.2)
+  )
+g
+```
+### Add vertical lines with labels to represent events
+
+Now we’ll add vertical lines to indicate events of interest: Theresa May’s resignation, Boris Johnson’s appointment as PM, Election day.
+
+For each event we’ll add a vertical line and a label. We will use two geoms for this geom_vline and geom_label.
+
+```{r}
+g <- g +
+  
+  # vertical line for Theresa' May's resignation
+  geom_vline(
+    xintercept = as.Date("07/06/2019", format = "%d/%m/%Y") ,
+    linetype = "solid",
+    color = "grey",
+    size = 0.2,
+    alpha = 0.8
+  ) +
+  # label for Theresa' May's resignation
+  geom_label(
+    aes(
+      x = as.Date("07/06/2019", format = "%d/%m/%Y"),
+      y = 37,
+      label = "Theresa May resigns"
+    ),
+    color = "darkgrey",
+    fill = "white",
+    size = 2.5
+  ) +
+  
+  # vertical line for Boris Johnson's resignation
+  geom_vline(
+    xintercept = as.Date("24/07/2019", format = "%d/%m/%Y") ,
+    linetype = "solid",
+    color = "grey",
+    size = 0.2,
+    alpha = 0.8
+  ) +
+  
+  # label for Boris Johnson's resignation
+  geom_label(
+    aes(
+      x = as.Date("24/07/2019", format = "%d/%m/%Y"),
+      y = 42,
+      label = "Boris Johnson elected PM"
+    ),
+    color = "darkgrey",
+    fill = "white",
+    size = 2.5
+  ) +
+  
+  # to give better horizontal separation between vline and the finalpoints, I've 'moved' the election to 14/12/2019
+  geom_vline(
+    xintercept = as.Date("14/12/2019", format = "%d/%m/%Y") ,
+    linetype = "solid",
+    color = "grey",
+    size = 0.2,
+    alpha = 0.7
+  ) +
+  
+  geom_label(
+    aes(
+      x = as.Date("12/12/2019", format = "%d/%m/%Y"),
+      y = 49.2,
+      label = "General Election"
+    ),
+    color = "darkgrey",
+    fill = "white",
+    size = 2.5
+  )
+g
+```
+### Turn ‘clipping’ off
+
+You’ll notice that the label for the general election runs outside the plot and is clipped. We’ll tell ggplot to turn clipping off and we’ll set some margin around the plot.
+
+It seems that there is a bug in ggplot where adding subsequent separate theme elements removes the ticks in the x-axis, so I have to replace them again here.
+
+```{r}
+g <- g +
+  coord_cartesian(clip = 'off') +
+  theme(plot.margin = unit(c(0.5, 1, 0.5, 0.5), "cm")) +
+  theme(axis.ticks.x = element_line(size = 0.2))
+g
+```
+
+### Label the final points on the right handside
+
+We are now going to label the final poll numbers on the eve of the general election December 11th. As several polls were conducted, we’ll show the unweighted average score for each party. The idea is that we’ll show these values on the right hand side, with each party value coloured in the party colours. As there were really 4 parties of significant interest in this election, we will show values for the Conservatives, Labour, the Lib Dems and the Brexit Party. This also avoids us having to sort out the potentially difficult task of labelling in a tight space all the parties that were predicted to receive about 2% of the vote.
+
+
+### Create a hidden second y-axis
+
+I create a hidden secondary y axis on the right handside, specifying 4 breaks - one for the final (average) poll score for each of the 4 parties. Label each of these breaks in percentage format. Colour each value by the associated party value.
+
+First I calculate a data frame containing the final values for the y-axis labels on the right but only selecting the parties of interest
+
+```{r}
+# the last date in the series
+lastdate <- max(ukpoll_long_2019_daily_mean$date)
+
+# the final mean poll values for "con","lab","ldem" and "brx"
+ukpoll_long_2019_daily_mean_final <-
+  filter(
+    ukpoll_long_2019_daily_mean,
+    date == lastdate & party %in%  c("con", "lab", "ldem", "brx")
+  )
+```
+
+I have been showing you the power of incrementally building a plot like this in ggplot. At this point, I have to specify a second y-axis, which I do with the scale_y_continuous function, that I’ve already defined. I am simply going to override that initial definition with another. However, this is for tutorial purposes and keeps the amount of code I have to show at each step to a minimum. In a reality, you would go back and modify your existing scale_y_continuous function.
+
+
+```{r}
+g <- g +
+  
+  scale_y_continuous(
+    limits = c(0, 50),
+    breaks = seq(0, 40, by = 10),
+    name = NULL,
+    labels = paste0(seq(0, 40, by = 10), "%") ,
+    expand = c(0.01, 0),
+    sec.axis = dup_axis( # specifying the second y axis
+      breaks = ukpoll_long_2019_daily_mean_final$meanrating,
+      labels = paste0(round(
+        ukpoll_long_2019_daily_mean_final$meanrating, 1
+      ), "%"),
+      name = NULL
+    )
+  )
+g
+```
+The theme_minimum theme we are using as a base, suppresses the new axis line on the right. Otherwise we would have to explicitly set axis.line.y.right to element_blank() in a theme function.
+
+
+### Colour the right y-axis text
+
+Now we will colour the final values in party colours. We select a subset of party colours defined earlier - in fact, the first four. Then we order them in the order they should appear on the right y-axis.
+
+We then set the axis text colours to these subset of party colours in a theme function
+
+```{r}
+# reordering a subset of the party colours
+
+ukpoll.right.axis.colours <-
+  party.colours[1:4][order(-ukpoll_long_2019_daily_mean_final$meanrating)]
+
+g <- g +
+  theme(
+    axis.text.y.right = element_text(
+      margin = margin(0, 0, 0, 0) ,
+      size = 8,
+      colour = ukpoll.right.axis.colours
+    ),
+    axis.ticks.y.right =   element_line(size = 0.2)
+  ) +
+  
+  # ggplot bug removes ticks every time new theme function is specified
+  # replacing the ticks
+  theme(axis.ticks.x = element_line(size = 0.2))
+
+g
+```
+
+```{r}
+ggsave("UK.png")
+```
+
