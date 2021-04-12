@@ -1,0 +1,97 @@
+---
+title: "Part 3: Performance over years"
+output:
+  word_document: default
+  html_notebook: default
+---
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+### Importing relevant libraries
+```{r}
+library(readr)
+library(ggplot2)
+library(dplyr)
+library(tidyr)
+library(lubridate)
+library(scales)
+library(kableExtra)
+library(countrycode)
+library(grid)
+library(repr)
+library(gridExtra)
+```
+
+
+### Importing dataset
+```{r}
+df <- read.csv("OECD_PISA.csv") %>% select("ï..LOCATION","SUBJECT","TIME","Value")
+colnames(df)<-c("Location","Subject","Time","Value")
+head(df)
+```
+
+### Removing unnecessary rows and columsn
+```{r}
+df2 <- df %>% filter(Location=="IDN"|Location=="IRL"|Location=="AUT"|Location=="OAVG")
+df_boys <- df2 %>% filter(Subject=="BOY") %>% select("Location","Time","Subject","Value") %>% arrange(Location)
+df_girls <- df2 %>% filter(Subject=="GIRL") %>% select("Location","Time","Subject","Value")%>% arrange(Location)
+head(df_boys)
+head(df_girls)
+```
+### Plot
+```{r fig.height = 5.5, fig.width = 11,warning = FALSE,message=FALSE}
+# plot 1 : trends of boys reading score over time for the specific countries
+gboys<-ggplot(df_boys,aes(Time,Value,color=Location)) + 
+  geom_line(size = 1, alpha = 0.7) +
+  scale_color_manual(values = c("#0072b2", "#D55E00", "#009e73", "#E69F00"),name = NULL) + 
+  annotate(geom = 'segment', y = Inf, yend = Inf, color = '#6eb4d5', x = -Inf, xend = Inf, size = 1)+ # creates a blue top margin
+  labs(title = "Reading performance (PISA)",subtitle = "Boys score over time") +
+  theme(
+      axis.text.y = element_text(vjust = -0.5,margin = margin(r = -20)), # The text of y axis exists above the gridlines
+      axis.title.x = element_blank(),
+      axis.title.y = element_blank(),
+      axis.ticks.y = element_blank(),
+      axis.ticks.x = element_blank(),
+      panel.background = element_rect(fill = "#e2edf3"),
+      axis.line.x.bottom = element_line("#e2edf3", size= 9.7), # Hack : a background colour line at bottom to hide lower gridlines 
+      plot.title = element_text(size=15,color = "#696363",vjust = -4,face="bold"),
+      plot.subtitle = element_text(size=10,hjust = 0.75,vjust = 2,color = "#696363",face="bold"),
+      legend.position = "none", # removing legend for left visual
+      panel.grid.minor.x = element_blank(),
+      axis.text.x = element_text(vjust = -2)
+  ) +
+  scale_y_continuous(breaks = seq(340, 540, by = 20),minor_breaks = seq(0, 20, 10),limits = c(341, 550))
+  
+# plot 2 : trends of girls reading score over time for the specific countries
+ggirls<-ggplot(df_girls,aes(Time,Value,color=Location)) + 
+  geom_line(size = 1, alpha = 0.7) +
+  scale_color_manual(values = c("#0072b2", "#D55E00", "#009e73", "#E69F00"),labels = c("Austria", "Indonesia","Ireland","OECD - Average")) + 
+  annotate(geom = 'segment', y = Inf, yend = Inf, color = '#6eb4d5', x = -Inf, xend = Inf, size = 1)+ # creates a blue top margin
+  labs(title = " ",subtitle = "Girls score over time") +
+  theme(
+      axis.text.y = element_text(vjust = -0.5,margin = margin(r = -20)), # The text of y axis exists above the gridlines
+      axis.title.x = element_blank(),
+      axis.title.y = element_blank(),
+      axis.ticks.y = element_blank(),
+      axis.ticks.x = element_blank(),
+      panel.background = element_rect(fill = "#e2edf3"),
+      axis.line.x.bottom = element_line("#e2edf3", size= 9.7), # Hack : a background colour line at bottom to hide lower gridlines 
+      plot.title = element_text(size=15,color = "#696363",vjust = -4,face="bold"),
+      plot.subtitle = element_text(size=10,hjust = 0,vjust = 2,color = "#696363",face="bold"),
+      legend.direction = "horizontal",
+      legend.key = element_rect(fill = "white", color = NA),
+      legend.position = c(0.65, 1.043), # manually specifying legend location
+      legend.title = element_blank(),
+      panel.grid.minor.x = element_blank(), 
+      axis.text.x = element_text(vjust = -2)
+  ) +
+  scale_y_continuous(breaks = seq(340, 540, by = 20),minor_breaks = seq(0, 20, 10),limits = c(341, 550))
+
+
+
+g<-grid.arrange(gboys, ggirls, nrow = 1)
+ggsave(plot = g, filename = "Part3.png")
+
+```
+

@@ -1,0 +1,112 @@
+---
+title: 'Part 2 : Replicating the Visual'
+output:
+  word_document: default
+  html_notebook: default
+---
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+### Importing relavnt libraries
+```{r}
+library(readr)
+library(ggplot2)
+library(dplyr)
+library(tidyr)
+library(lubridate)
+library(scales)
+library(kableExtra)
+library(countrycode)
+library(grid)
+library(repr)
+```
+
+### Reading the original dataset
+```{r}
+df <- read.csv("OECD_PISA.csv") %>% select("ï..LOCATION","SUBJECT","TIME","Value")
+colnames(df)<-c("Location","Subject","Time","Value")
+head(df)
+```
+### Filtering the relevant rows for this part
+```{r}
+df2 <- df %>% filter(Time==2018) %>% filter(Subject=="BOY"|Subject=="GIRL")
+head(df2)
+```
+
+### Dividing dataset into boys and girls to find ordering of data
+```{r}
+df_boys <- df2 %>% filter(Subject=="BOY") %>% select("Location","Subject","Value") %>% arrange(Value)
+df_girls <- df2 %>% filter(Subject=="GIRL") %>% select("Location","Subject","Value")%>% arrange(Value)
+head(df_boys)
+head(df_girls)
+# The plot orders in the flow of boys dataset
+```
+### Finding the ordered country codes and country names
+```{r ,warning = FALSE,message=FALSE}
+# the level of boys will be used in visual as it creates an increasing order
+countrycodes <- df_boys$Location
+countryfullnames <- countrycode(df_boys$Location,origin = 'iso3c', destination = 'country.name')
+# warning: Some values were not matched unambiguously: OAVG
+countryfullnames[is.na(countryfullnames)]='OECD - Average'
+countryfullnames
+```
+
+```{r fig.height = 5.5, fig.width = 11,warning = FALSE,message=FALSE}
+
+# creating a separate dataframe for this exercise
+df3 <-df2
+df3$Color <- ifelse(df3$Location == "IRL"|df3$Location == "OAVG",ifelse(df3$Location == "IRL","red","black"),"blue")
+df3$shape <-ifelse(df3$Subject=="BOY","A",ifelse(df3$Location == "IRL"|df3$Location == "OAVG","B","C"))
+df3$fill <- ifelse(df3$Subject=="BOY","A",ifelse(df3$Location == "IRL","B",ifelse(df3$Location == "OAVG","C","D")))
+
+# Define plot title,subtile and caption
+plot.title = "Reading Performance (PISA)"
+plot.subtitle = "Boys/Girls,Mean score,2018"
+plot.caption = "Source:PISA: Programme for International Student Assessment"
+
+g <-ggplot(df3,aes(x=factor(Location,levels = countrycodes), y=Value,colour=Color,shape=shape,fill=fill)) + #countrycodes represent country code orders of boys dataset
+  geom_segment(aes(xend = Location), yend = 0, colour="white", size=0.25) + # create a white line till boys coordinate
+  geom_line(aes(group = Location),colour = "#bbc9d4", size=0.5,aplha=0.7) + #creates a coloured line from boys to girls coordinate
+  geom_point(size=2,stroke = 1) +
+  annotate(geom = 'segment', y = Inf, yend = Inf, color = '#6eb4d5', x = -Inf, xend = Inf, size = 1)+ # creates a blue top margin
+  labs(title = plot.title,subtitle = plot.subtitle,caption = plot.caption)+
+    theme(
+      axis.text.x = element_text(angle = 45, vjust = 0.8, hjust = 1,color = ifelse(countryfullnames=="Ireland","Red","#716d6d"),face = ifelse(countryfullnames=="OECD - Average","bold","plain"),size = 8), # specific colours for special cases like Ireland and OECD Average
+      axis.text.y = element_text(vjust = -0.5,margin = margin(r = -20)), # The text of y axis exists above the gridlines
+      axis.title.x = element_blank(),
+      axis.title.y = element_blank(),
+      axis.ticks.y = element_blank(),
+      axis.ticks.x = element_blank(),
+      axis.line.x.bottom = element_line("#e2edf3", size= 9.7), # Hack : a background colour line at bottom to hide lower gridlines 
+      panel.background = element_rect(fill = "#e2edf3"),
+      panel.grid.major.x = element_blank(), 
+      #legend.position = c(0.077, 1),
+      legend.position = "none",
+      legend.title = element_blank(),
+      legend.direction = "horizontal",
+      legend.key = element_rect(fill = "white", color = NA),
+      plot.title = element_text(size=15,color = "#696363",vjust = -4,face="bold"),
+      plot.subtitle = element_text(size=10,hjust = 0.33,vjust = 2,color = "#696363",face="bold"),
+      plot.caption  = element_text(size=10,hjust = 1,vjust = 151,color = "#696363",face="bold"),
+      plot.margin = unit(c(5.5,5.5,26,5.5), "points") # Default margins :theme_get()$plot.margin -> 5.5points 5.5points 5.5points 5.5points
+    ) +
+  scale_colour_manual(values = c("#000000","#406d89","#ea1f25")) +
+  scale_shape_manual(values = c(19, 23,23)) + 
+  scale_fill_manual(values = c("yellow","red","black","#e2edf3"))+
+  scale_y_continuous(breaks = seq(340, 560, by = 20),minor_breaks = seq(0, 20, 10),limits = c(341, 567)) + 
+  scale_x_discrete(labels= countryfullnames,expand = expansion(add = 1.5))
+g
+
+ggsave(plot = g, filename = "Part2.png")
+
+# References:
+# https://www.datanovia.com/en/blog/ggplot-legend-title-position-and-labels/
+# https://stackoverflow.com/questions/48214915/how-to-increase-size-of-ggplot-squeezed-horizontal-bar-chart
+# https://www.listendata.com/2017/03/if-else-in-r.html
+# https://viz-ggplot2.rsquaredacademy.com/labels.html
+# https://stackoverflow.com/questions/55406829/ggplot-put-axis-text-inside-plot
+# https://stackoverflow.com/questions/56097381/adding-some-space-between-the-x-axis-and-the-bars-in-ggplot/56097971
+# https://stackoverflow.com/questions/46256851/how-to-add-line-at-top-panel-border-of-ggplot2
+# https://stackoverflow.com/questions/10836843/ggplot2-plot-area-margins
+```
