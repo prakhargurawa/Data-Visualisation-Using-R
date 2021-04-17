@@ -1,0 +1,249 @@
+---
+title: "Time Data as Ordinal Values"
+output: html_notebook
+---
+
+### Scottish Independence
+
+The Brexit campaign in the UK over the past two years has re-awoken the geo-political debate in Scotland over independence. As the UK prepared to leave the EU, successive opinion polls in Scotland showed no clear majority for a yes or a no vote for independent.
+
+The Scottish first minister, Nicola Sturgeon, is trying to convince the UK government to allow Scotland hold a referendum on independence. In discussing this, many news articles have referenced opinion polls where there is no clear trend one way or the other.
+
+We will look at producing a visualisation that shows the closeness of the two positions on independence: yes vs no, based on several recent surveys.
+
+### Read the data
+
+```{r}
+library(readr)
+library(dplyr)
+library(tidyr)
+library(ggplot2)
+library(lubridate)
+library(kableExtra)
+
+# read in two data sets - one for 2018 and one for 2019
+scot.ind<-read_csv("2020_scottish_independence.csv")
+# make the date field into a date object and order the dataset by date
+scot.ind<-scot.ind%>%mutate(date = dmy(date))%>%arrange(desc(date))
+
+kable(scot.ind, digits = 2, format = "html", row.names = FALSE) %>%
+  kable_styling(
+                full_width = F,
+                font_size = 12,
+                position = "center")%>%
+  scroll_box(height = "200px")
+```
+
+### Convert to long format
+
+```{r}
+scot.ind.l <- scot.ind%>%
+  gather(vote, value, yes:no)%>%
+  arrange(desc(date))
+
+kable(
+  scot.ind.l,
+  digits = 2,
+  format = "html",
+  row.names = FALSE
+) %>%
+  kable_styling(full_width = F,
+                font_size = 12,
+                position = "center")%>%
+  scroll_box(height = "400px")
+```
+```{r}
+ggplot(scot.ind.l, aes(x=value, y=date, colour=vote)) +
+  geom_point(size = 2.2) +
+  theme_minimal()
+```
+
+ggplot treated the data as it would time series data by spacing the points according to the interval between timestamps. However, the time stamps are not evenly spaced. E.g. there is a big gap between the Survation poll on Dec 11th and the following Survation poll on Jan 22nd. This is followed by a gap of just 5 days to the YouGov poll on January 27th. This is typical of polling data. It is carried out by independent organisations - and the polls are generally not synchronised.
+
+This data might be called ordinal time data instead of Time Series data. The order of the data matters is of of primary importance; the time stamp and the interval between time stamps are of less important.
+
+To achieve this we have to reassign the variable assigned to the y-axis. We have to create a dummy ordinal variable that reflects the order of the dates. The y-axis scale will represent the values of this variable. The dates will be used as labels.
+
+In the original wide form data set, I create a new variable called seq, which has sequence of evenly spaced dummy values. The variable is an ordered factor.
+
+Then I transform the data to long format as before for plotting with ggplot.
+
+Now we can attempt a basic plot again
+
+```{r}
+# insert sequence of vaues - this is what we wil use on the y axis
+scot.ind$seq <- factor(nrow(scot.ind):1, levels=1:nrow(scot.ind))
+scot.ind <-scot.ind%>%
+  select(seq, everything())%>%
+  arrange(seq) # brings seq to front and orders by seq
+
+kable(scot.ind, digits = 2, format = "html", row.names = FALSE, caption = "The data with the seq dummy variable") %>%
+  kable_styling(
+                full_width = F,
+                font_size = 12,
+                position = "center")
+```
+```{r}
+# convert to long format
+scot.ind.l <-scot.ind%>% 
+  gather(vote, value, yes:no)%>%
+  arrange(seq)
+
+kable(head(scot.ind.l), digits = 2, format = "html", row.names = FALSE, caption = "The data in long format") %>%
+  kable_styling(
+                full_width = F,
+                font_size = 12,
+                position = "center")
+```
+
+```{r}
+g<- ggplot(scot.ind.l, aes(x=value, y=seq, colour=vote)) +
+  geom_point(size = 2.2) +
+  theme_minimal()
+
+g
+```
+However The y-axis shows the sequence values and it should show the date and pollster.
+
+We can set the labels we want using the scale_y_discrete function ot override the axis settings for the the y axis. We use scale_y_discrete because you may recall that the seq variable was created as a ordered factor, not an integer.
+
+The labels we will show are the data and pollster values in the data inits wide format. When you are imposing labels on a plot from an external data set, you need to make sure that the labels are ordered correctly. You may have noticed that I used the arrange function on the data sets in both wide and long form - this was to make sure that the instances were in the same ordering by date.
+
+```{r}
+g <- g +
+  scale_y_discrete(labels = paste0(scot.ind$pollster, ", ", scot.ind$date),
+                   name = NULL)
+g
+```
+
+The x axis by default has take the min and max values assigned to it and set theses as the axis limits. However, it gives the impression of a much larger spread between yes and no values than is the case.
+
+We are going to set the limit to between 25% and 75% to emphasise how close the polling values are. We override the x axis defaults by calling scale_x_continuous and setting the limits to between 25 and 75; We set the breaks to c(25,50 and 75) and the labels to include a % sign after the break values
+
+
+```{r}
+g <- g +
+  scale_x_continuous(
+    breaks = c(25, 50, 75),
+    limits = c(25, 75),
+    labels = paste0(c(25, 50, 75), "%"),
+    name = NULL
+  )
+g 
+```
+
+This brings us very close to what we wanted to achieve. There are still a few modifications still.
+
+I want the date names to be represented in abbreviated form
+I want to override the default colours
+Where yes and no votes are tied at 50%, I want to show two points at that position. Currently, the no vote covers the yes vote completely at that 50% mark.
+The lubridate library is a very useful library for manipulating date data in R,l
+
+I use the month and mday functions from thelubridate library to extract out the abbreviated month string and the day of the month from the data object.
+
+I specify two colours for the no and yes votes – and I override the default colours using the scale_fill_manual function
+
+The final modification requires us to slightly nudge apart the values at the 50% value so that the reader can see that there are two points represented – a yes and a no value.
+
+I could use geom_jitter which introduces some positional variation – but this is really only useful when we have a lot of points close together. Also , a slight variation in this plot could indicate a value of 51% or 49% to the reader
+
+Instead, the strategy is:
+
+Plot all points not equal to 50% as before
+For yes points =50% change their y value position upwards slightly
+For no points = 50% change their y value position downwards by the same amount
+
+```{r}
+library(dplyr)
+
+colours <- c("red3", "dodgerblue3")
+
+ggplot(scot.ind.l, aes(
+  x = value,
+  y = seq,
+  fill = vote,
+  group = date
+)) +
+  
+  geom_line(aes(group = seq), colour = "grey", size = 1) +
+  
+  # for values not equal to 50% plot as before
+  geom_point(
+    data = scot.ind.l %>% filter(value != 50),
+    size = 2.5,
+    shape = 21,
+    colour = "white"
+  ) +
+  # for yes votes at 50%, nudge upwards
+  geom_point(
+    data = scot.ind.l %>% filter(vote == "yes" &
+                                   value == 50),
+    fill = colours[2],
+    position = position_nudge(x = 0, y = 0.08),
+    size = 2.5,
+    shape = 21,
+    colour = "white"
+  ) +
+  # for no votes at 50%, nudge upwards
+  geom_point(
+    data = scot.ind.l %>% filter(vote == "no" &
+                                   value == 50),
+    fill = colours[1],
+    position = position_nudge(x = 0, y = -0.08),
+    size = 2.5,
+    shape = 21,
+    colour = "white"
+  ) +
+  
+  scale_y_discrete(labels = paste0(
+    scot.ind$pollster,
+    ", ",
+    month(scot.ind$date, label = TRUE, abbr = TRUE),
+    " ",
+    mday(scot.ind$date)
+  ),
+  name = NULL) +
+  
+  scale_x_continuous(
+    breaks = c(25, 50, 75),
+    limits = c(25, 75),
+    labels = paste0(c(25, 50, 75), "%"),
+    name = NULL
+  ) +
+  
+  # add custom colours
+  scale_fill_manual(values = colours, name = NULL) +
+  ggtitle("Scottish Independence") +
+  
+  theme_minimal() +
+  
+  theme(
+    axis.text.y = element_text(hjust = 0),
+    panel.grid.major.y = element_line(size = 0.3),
+    panel.grid.major.x = element_line(size = 0.6),
+    panel.grid.minor.x = element_blank(),
+    plot.margin = unit(c(1, 1, 1, 1), "cm"),
+    plot.title = element_text(
+      size = 8,
+      face = "bold",
+      vjust = 0.4,
+      hjust = 0.5
+    )
+  ) +
+  theme(
+    legend.text = element_text(size = 8),
+    legend.title = element_blank(),
+    legend.position = c(.85, 1.05),
+    # move to the top
+    legend.direction = "horizontal",
+    # make it horizontal
+    legend.key.size = unit(0.9, "line"),
+    legend.spacing.x = unit(0.1, 'cm'),
+    legend.background = element_rect(
+      fill = "white",
+      size = 0.5,
+      colour = "white"
+    )
+  )
+```
+
