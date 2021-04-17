@@ -1,0 +1,381 @@
+---
+title: "Bubble chart over time"
+output:
+  word_document: default
+  html_notebook: default
+---
+
+In this section we are going to include all the time data in the data set – so we are going to visualise the GDP and life expectancy trends from 1990 to 2014 for each region in the data set
+
+GDP is a simply a fairly crude economic measure of a country’s wealth. However, it seems to be fact of life that higher GDP in a country entails relatively higher capacity to support the well being of the country’s population.
+
+Our visualisation should uncover that relationship.
+
+I would expect to see some regions to have made relatively short journeys, while others have accelerated to catch up with with the wealthier regions.
+
+### Data Processing using dplyr
+
+I use dplyr functions to produce a view of the nations_data where each region has a ave_gdp_perca (average gdp) and ave_life_expect (average life expectancy).
+
+In order to show the comparative populations per region, the population of each region is calculated by suming the populations of its member countries.
+
+The dplyr library is very useful for processing and filtering data. It is part of tidyverse so you more than likely have it installed
+
+Some of the most useful functions in dplyr:
+
+select Choose which columns to include.
+filter Filter the data.
+arrange Sort the data, by size for continuous variables, by date, or alphabetically.
+group_by Group the data by a categorical variable.
+summarize Summarise or aggregate (for each group if following group_by). Often used in conjunction with functions including:
+mean Calculate the mean, or average.
+median Calculate the median.
+max Find| the maximum value.
+min Find the minimum value
+sum Add all the values together.
+n Count the number of records.
+mutate Create new column(s) in the data, or change existing column(s).
+rename Rename column(s).
+bind_rows Merge two data frames into one, combining data from columns with the same name.
+These functions can be chained together using the operator %>% which makes the output of one line of code the input for the next. This allows you to run through a series of operations in logical order. I find it helpful to think of %>% as “then.”
+
+### Analysis
+As there is high variation in population per region, a simple mean is not appropriate for ave_gdp_perca (average gdp) and ave_life_expect.
+
+As such, I calculate a weighted.mean per region, where the weight is defined by the population proportions of the region’s countries.
+```{r}
+library(tidyverse)
+library(ggplot2 )
+library(readr)
+library(scales)
+    
+# load data
+nations_data <- read_csv("nations.csv")
+```
+```{r}
+ library(kableExtra)
+# summarising the region data. 
+# For each region average life expectancy and average gdp per cap is calculated, using a weighted average  - weighted according to the population of the countries in the region
+
+regions<-nations_data %>%
+  filter(!is.na(population))%>% # weighted.mean can't handle NAs in the weight vector
+  select(region,year, population, gdp_percap, life_expect) %>% 
+  group_by(year, region) %>% 
+  summarize(totalPop = sum(population,na.rm = TRUE), ave_gdp_percap = weighted.mean(gdp_percap, population, na.rm = TRUE), ave_life_expect = weighted.mean(life_expect, population,na.rm = TRUE ))
+
+
+  kable(regions, digits = 2, format = "html", row.names = TRUE) %>%
+  kable_styling( bootstrap_options = c("striped"),full_width = F,
+                font_size = 10) %>%
+  
+   scroll_box(height = "300px")
+```
+### Bubble plot
+
+We can now plot this new data using a variation of earlier single plot. The main differences are:
+
+aesthetics are applied to ave_gdp_percap,ave_life_expect and totalPop fields
+x and y labels refer to Average GDP per Capita (USD), etc
+I added a breaks attribute to the scale_x_log10 function so that more labelled units would show on the x axis (trans_breaks).
+The geo_point has a very small alpha value because many of these points are going to overlap. I want the overlap to be clearly perceived.
+I’ve explicitly set the alpha value of the colour in the legend to 0.5. Otherwise, it would have the same value as the alpha value of the geom_point - which was too faint
+
+
+```{r}
+p.regions.ave <-
+  ggplot(regions,
+         aes(
+           x = ave_gdp_percap,
+           y = ave_life_expect,
+           size = totalPop,
+           color = region
+         )) +
+  geom_point(na.rm = TRUE, alpha = 0.25) +
+  ggtitle("Trajectory 1990-2014: Average Life Expectancy vs average GDP per Capita per Region") +
+  xlab("Average GDP per Capita (USD)") +
+  ylab("Average Life Expectancy (years)") +
+  # note how scale breaks are inserted
+  scale_x_log10(
+    labels = trans_format("log10", math_format(10 ^ .x)),
+    breaks = scales::trans_breaks("log10", function(x)
+      10 ^ x)
+  ) +
+  scale_color_brewer(palette = 'Dark2', name = "Region") +
+  scale_size_area(max_size = 6,
+                  labels  = comma,
+                  name = "Region \nPopulation") +
+  
+  
+  
+  #increase the size of the legend colour points, and their alpha value (too faint otherwise)
+  guides(color = guide_legend(override.aes = list(size = 3, alpha = 0.5))) +
+  
+  
+  theme_minimal(base_size = 10) +
+  theme(panel.grid.major = element_line(size = 0.2),
+        panel.grid.minor = element_line(size = 0.1))
+
+plot(p.regions.ave)
+```
+
+###  Labelling the regions
+Lets get rid of one of the legends. We will label one data point per region
+
+Let’s choose the data point in each region for the year 1990.
+
+I will use the ggrepel library. Text labels repel away from each other, away from data points, and away from edges of the plotting area.
+
+There is a trick to using ggrepel to make ensure that it doesn’t place labels over unlabelled points : create a column called label. Give every point a blank label value ("") by default and then override this for the points that should actually have a label value.
+
+ggrepel will not create a label for points with a blank label value, but will try to avoid overlapping them, treating as if they were in fact labelled.
+
+```{r}
+regions$label <-"" # default is empty string
+
+# my understanding of how ggrepl works is that it will repel labels away from empty labels as well, which is why I set the default labels = ""
+
+# just one label for each region in the year 1990
+regions[regions$year==1990,]$label<- regions[regions$year==1990,]$region
+```
+
+
+```{r}
+library(ggrepel)
+
+p.regions.ave <-
+  ggplot(
+    regions,
+    aes(
+      x = ave_gdp_percap,
+      y = ave_life_expect,
+      size = totalPop,
+      color = region,
+      group = region
+    )
+  ) +
+  geom_point(na.rm = TRUE, alpha = 0.25) +
+  ggtitle("Trajectory 1990-2014: Average Life Expectancy vs average GDP per Capita per Region") +
+  xlab("Average GDP per Capita (USD)") +
+  ylab("Average Life Expectancy (years)") +
+  # note how scale breaks are inserted
+  scale_x_log10(
+    labels = trans_format("log10", math_format(10 ^ .x)),
+    breaks = scales::trans_breaks("log10", function(x)
+      10 ^ x)
+  ) +
+  scale_color_brewer(palette = 'Dark2', guide = FALSE) +
+  scale_size_area(max_size = 6,
+                  labels  = comma,
+                  name = "Region \nPopulation") +
+  
+  geom_path(size = 0.2,
+            inherit.aes = T,
+            colour = "black") +
+  #Using geom_label to add text labels
+  geom_text_repel(
+    aes(label = label),
+    size = 3,
+    min.segment.length = unit(0, 'lines'),
+    segment.size = 0.2,
+    segment.color = "dodgerblue2",
+    label.padding = unit(0.1, "lines"),
+    force = 10,
+    label.r = unit(0.15, "lines"),
+    colour = "black",
+    alpha = 0.5,
+    na.rm = TRUE,
+    show.legend = FALSE
+  )  +
+  
+  theme_minimal(base_size = 10) +
+  theme(panel.grid.major.y = element_line(size = 0.2)) +
+  theme(panel.grid.minor.y = element_line(size = 0.1)) +
+  theme(panel.grid.major.x = element_line(size = 0.2)) +
+  theme(panel.grid.minor.x = element_line(size = 0.1))
+
+
+plot(p.regions.ave)
+```
+
+### Labelling time values
+
+The labelling is mostly fine. However, There are a few problems with this plot
+
+This is a time series plot and there is an implicit sequence of year values presented here - but not an indication of their starting or end values, or in fact the direction. In fact, each point does slightly more to the right from its predecessor - but there’s no reason why GDP and Life Expectancy couldn’t start to reverse.
+
+In short, we need to label the time points - at least the start and end points.
+
+```{r}
+# Create a label for the min and max year in each region
+
+regions <- regions %>%
+  filter(!is.na(ave_life_expect) & !is.na(ave_gdp_percap)) %>%
+  group_by(region) %>% mutate(label = ifelse(year == min(year) |
+                                               year == max(year) , year, ""))
+
+p.regions.ave <-
+  ggplot(
+    regions,
+    aes(
+      x = ave_gdp_percap,
+      y = ave_life_expect,
+      size = totalPop,
+      color = region,
+      group = region
+    )
+  ) +
+  geom_point(na.rm = TRUE, alpha = 0.25) +
+  ggtitle("Trajectory 1990-2014: Average Life Expectancy vs average GDP per Capita per Region") +
+  xlab("Average GDP per Capita (USD)") +
+  ylab("Average Life Expectancy (years)") +
+  # note how scale breaks are inserted
+  scale_x_log10(
+    labels = trans_format("log10", math_format(10 ^ .x)),
+    breaks = scales::trans_breaks("log10", function(x) 10 ^ x)) +
+ 
+  scale_color_brewer(palette = 'Dark2', name = NULL) +
+  scale_size_area(max_size = 6, labels  = comma, name = "Region Population") +
+  
+geom_path(size = 0.3, inherit.aes = T, colour="black") +
+  
+  geom_text_repel(
+    aes(label = label),
+    size = 2.5,
+    min.segment.length = unit(0, 'lines'),
+    segment.size = 0.2,
+    segment.color = "dodgerblue2",
+    colour = "black",
+    force = 4,
+    alpha = 0.8,
+    na.rm = TRUE,
+    show.legend = FALSE
+  ) +
+  
+  theme_minimal(base_size = 10) +
+  theme(panel.grid.major.y = element_line(size=0.2))+
+  theme(panel.grid.minor.y = element_line(size=0.1))+
+  theme(panel.grid.major.x = element_line(size=0.2))+
+  theme(panel.grid.minor.x = element_line(size=0.1))+
+  # increase the size of the legend colour points, and their alpha value (too faint otherwise)
+  guides(color = guide_legend(override.aes = list(size = 3, alpha = 0.5))) 
+  
+  plot(p.regions.ave)
+```
+
+We’ve replaced the colour legend so as to allow the labelling of year values. I think that this is the prefered solution.
+
+I have added aline through each set of regional points to emphasis the trends.
+
+The geom I used for this is not geom_line which plots a line based on the sequence of x axis values. Instead I am using geom_path which plots a line according to the sequence of the points in the data set – which are ordered by year value ascending.
+
+This is important because there may be situations that you plot where the point ordering is not clear
+
+Here the line helps to emphasis the trend – and we can clearly see the drop in Life expectancy . In Europe in the early nineties – and the thickening of the line in the early 90s in Sub-Sahara Africa suggests the leftward direction towards lower GDP
+
+### A Faceted approach
+
+However, there may be situations where you need to facet the graph. Because each panel represents a region, you no longer need colour to differentiate the series.
+
+When faceting you inevitably lose some of the ease of comparison that a single plot offers. However, the extra space per panel does allow you add extra information that might become too crowded in a single plot.
+
+In the plot below, I’ve calculated the world mean per year for life expectancy and GDP. This acts as a reference line to explain the trends in each series.
+
+For example, you can see that North America in 1990 was ahead of the 2014 world mean for GDP and Life Expectancy.
+
+The GDP in South Asia in 2014 is about that of the 1990 world mean, though life expectancy in South Asia 2014 is higher than the world mean in 1990.
+
+In this section of code, I calculate the world mean per year for life expectancy and GDP. I will plot this line and we will see what regions sit on either side of it
+
+```{r}
+nations_mean_per_year<-nations_data %>% 
+  filter(!is.na(population))%>% # weighted.can't handle NAS in the weight vector
+  select(country, region,year, population, gdp_percap, life_expect) %>% 
+  group_by(year) %>% 
+  summarize(totalPop = sum(population,na.rm = TRUE), ave_gdp_percap = weighted.mean(gdp_percap, population, na.rm = TRUE), ave_life_expect = weighted.mean(life_expect, population, na.rm = TRUE ))
+```
+
+```{r}
+library(ggrepel)
+
+  p.regions.ave <-
+  ggplot(
+    regions,
+    aes(
+      x = ave_gdp_percap,
+      y = ave_life_expect,
+      size = totalPop,
+      group = region
+    )
+  ) +
+  geom_point(na.rm = TRUE, alpha = 0.15) +
+  ggtitle("Trajectory 1990-2014: Average Life Expectancy vs average GDP per Capita per Region") +
+  xlab("Average GDP per Capita (USD)") +
+  ylab("Average Life Expectancy (years)") +
+  # note how scale breaks are inserted
+  scale_x_log10(
+    labels = trans_format("log10", math_format(10 ^ .x)),
+    breaks = scales::trans_breaks("log10", function(x) 10 ^ x)
+  ) +
+  scale_size_area(max_size = 4, labels  = comma, name = "Region Population") +
+  
+  geom_path(data=nations_mean_per_year, aes(x = ave_gdp_percap,
+      y = ave_life_expect), size = 0.2, colour = "red", inherit.aes = F) +
+    geom_path(size = 0.2, inherit.aes = T, colour="black") +
+  
+  geom_text_repel(
+    aes(label = label),
+    size = 2.5,
+    min.segment.length = unit(0, 'lines'),
+    segment.size = 0.15,
+    colour = "black",
+    segment.color = "dodgerblue2",
+    force = 15,
+    alpha = 0.8,
+    na.rm = TRUE,
+    show.legend = FALSE
+  ) +
+  
+  theme_minimal(base_size = 10) +
+  theme(panel.grid.major.y = element_line(size=0.2))+
+  theme(panel.grid.minor.y = element_line(size=0.15))+
+  theme(panel.grid.major.x = element_line(size=0.2))+
+  theme(panel.grid.minor.x = element_line(size=0.15))+
+  theme(axis.title.x = element_text(hjust = -0.01))+
+  theme(legend.title = element_text(size = 8))+
+  theme(legend.box.background = element_rect(colour = "grey", size=0.2))+
+  # increase the size of the legend colour points, and their alpha value (too faint otherwise)
+  guides(color = guide_legend(override.aes = list(size = 3, alpha = 0.5)))  +
+    
+    facet_wrap(vars(region))
+```
+
+```{r}
+shift_legend2 <- function(p, position) {
+  # ...
+  # to grob
+  gp <- ggplotGrob(p)
+  facet.panels <- grep("^panel", gp[["layout"]][["name"]])
+  empty.facet.panels <- sapply(facet.panels, function(i) "zeroGrob" %in% class(gp[["grobs"]][[i]]))
+  empty.facet.panels <- facet.panels[empty.facet.panels]
+
+  # establish name of empty panels
+  empty.facet.panels <- gp[["layout"]][empty.facet.panels, ]
+  names <- empty.facet.panels$name
+  # example of names:
+  #[1] "panel-3-2" "panel-3-3"
+
+# now we just need a simple call to reposition the legend
+  reposition_legend(p, position, panel=names)
+}
+```
+
+```{r}
+library(ggplot2)
+library(gtable)
+library(lemon)
+```
+
+```{r}
+shift_legend2(p.regions.ave, "center")
+```
+
