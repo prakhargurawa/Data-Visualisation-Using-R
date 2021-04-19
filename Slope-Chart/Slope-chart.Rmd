@@ -1,0 +1,514 @@
+---
+title: "Slope charts"
+output: html_notebook
+---
+
+The Slope chart was introduced by Edward Tufte in his 1983 book The Visual Display of Quantitative Information.
+
+He didn’t give the chart a name then and it has only fairly recently acquired the name slope chart.
+
+Tufte suggests that this type of chart is good for seeing
+
+The ranking of categories between time stamps
+The specific numbers associated with category in each time stamp
+How each categories numbers changed over time (the slope)
+How each categories ’s rate of change compares to the other categories’ rates of change ( how the slopes compare)
+Notable deviations in terms of slope
+To examine slope graphs we are going to visualise some data collected by an organisation called Transparency International (TI) Ireland, which is the Irish chapter of the Transparency International, a global organisation dedicated to exposing corruption worldwide.
+
+## Reading dataset
+
+```{r}
+library(readr)
+library(dplyr)
+library(tidyr)
+library(kableExtra)
+
+# read in two data sets - one for 2018 and one for 2019
+ire.councils.2018<-read_csv("ire-transparency-Ireland-councils-2018.csv")
+ire.councils.2019<-read_csv("ire-transparency-Ireland-councils-2019.csv")
+
+kable(ire.councils.2018, digits = 2, format = "html", row.names = FALSE, caption = '<b>National Integrity Index 2018</b>') %>%
+  kable_styling(
+                full_width = F,
+                font_size = 12,
+                position = "center")%>%
+  scroll_box(height = "300px")
+```
+```{r}
+kable(ire.councils.2019, digits = 2, format = "html", row.names = FALSE, caption = '<b>National Integrity Index 2019</b>') %>%
+  kable_styling(
+                full_width = F,
+                font_size = 12,
+                position = "center")%>%
+  scroll_box(height = "300px")
+```
+### Merging the two data sets
+
+The easiest way to do this is to first add a year field to each data set and the append one after the other using rbind.
+
+I will also rename the score-out-of-30 field to score and will calculate a percent field.
+
+I make year into factor, with the default levels (2018, 2019)
+```{r}
+ire.councils.2018$year <- '2018'
+ire.councils.2019$year <- '2019'
+
+ire.councils.18.19<-rbind(ire.councils.2018, ire.councils.2019)
+
+ire.councils.18.19<-ire.councils.18.19%>% 
+  rename(
+    score = `score-out-of-30`
+    )%>% 
+  mutate(percent= round(100*score/30,0))%>%
+  mutate(year=factor(year))
+
+
+kable(ire.councils.18.19, digits = 2, format = "html", row.names = FALSE, caption = '<b>National Integrity Index 2018 - 2019</b>') %>%
+  kable_styling(
+                full_width = F,
+                font_size = 12,
+                position = "center")%>%
+  scroll_box(height = "300px")
+```
+###  Selecting the data
+
+Including all councils may make this plot look a little cluttered
+
+What councils do we want to compare? Obviously Galway City Council and Galway County Council.
+
+We will compare them to the top 5 councils in 2018 (which includes Galway City) and in 2019. And we will include the bottom five councils in 2018 (which includes Galway county) and in 2019.
+
+This means we have to create a subset of our data.
+
+```{r}
+# top 5 councils in 2018
+ire.councils.18.19%>%
+  filter(year=='2018')%>%
+  arrange(desc(score)) %>%
+  top_n(n = 5, wt = score)%>%
+  select(short) -> top2018
+
+# bottom 5 councils in 2018
+ire.councils.18.19%>%
+  filter(year=='2018')%>%
+  arrange(desc(score)) %>%
+  top_n(n = -5, wt = score)%>%
+  select(short) -> bottom2018
+
+# top 5 councils in 2019
+ire.councils.18.19%>%
+  filter(year=='2019')%>%
+  arrange(desc(score)) %>%
+  top_n(n = 5, wt = score)%>%
+  select(short) -> top2019
+
+# bottom 5 councils in 2019
+ire.councils.18.19%>%
+  filter(year=='2019')%>%
+  arrange(desc(score)) %>%
+  top_n(n = -5, wt = score)%>%
+  select(short) -> bottom2019
+
+
+# bind these data frames with the list of councils we want 
+councils <- rbind(top2018,bottom2018, top2019, bottom2019)
+# remove duplicates (e.g some councils are in the top 5 in 2018 and 2019)
+councils <-unique(unlist(as.list(councils)))
+
+# create a subset of councils
+ire.councils.18.19.subset<- ire.councils.18.19%>%
+  filter(short %in% councils )
+
+# show as a table
+kable(ire.councils.18.19.subset, digits = 2, format = "html", row.names = FALSE, caption = '<b>Subset of councils we will show in the slope chart</b>') %>%
+  kable_styling(
+                full_width = F,
+                font_size = 12,
+                position = "center")%>%
+  scroll_box(height = "300px")
+```
+### Building a basic slope chart
+
+Now we can create a basic slope chart, plotting the percentage values per year for our subset of councils.
+
+Two lines of ggplot code will show the basic anatomy of the plot
+
+
+```{r}
+library(ggplot2)
+library(ggrepel)
+
+slope_data <-ire.councils.18.19.subset
+
+g<-ggplot(slope_data, aes(x = year, y = percent, group = short)) +
+    
+  geom_line(size = 0.25, colour = "darkgrey") 
+
+g
+```
+The x-axis uses a discrete scale to represent the year variable (a factor). It has two values : 2018 and 2019
+
+Here we also specify that the x axis is on top of the plot. This will move the axis text (for 2018 and 2019 ) to the top also.
+
+The expand function expands distance between the first and last x values and the left and right edges of the graph. This leaves room for the labels for the council names
+
+First we will display the line of values for each year. These are simply geom_label objects positioned on the plot according to the (year, percentage) value of each point
+
+
+```{r}
+g <- g+ 
+  
+  scale_x_discrete(position = "top", expand=c(0.2, 0.2)) + 
+  
+  geom_label(aes(label = paste0(percent,"%")), 
+             size = 2.5, 
+             label.padding = unit(0.085, "lines"), 
+             label.size = 0.0) 
+g
+```
+
+Now add the council name labels on the left (for the points with year ==‘2018’). These will be geom_text_repel objects because ordinary labels geom_label objects will overlap where councils have similar percentage values. The geom_text_repel objects will avoid overlapping each other and will automatically include a line segment connecting the label to the point where necessary. We’ve left justified these labels for readability.
+
+
+
+```{r}
+library(ggplot2)
+library(ggrepel)
+
+g <- g +
+  geom_text_repel(
+    data = ire.councils.18.19.subset %>% filter(year == "2018"),
+    aes(label = short) ,
+    hjust = "left",
+    fontface = "bold",
+    size = 2.5,
+    nudge_x = -0.35,
+    segment.size = 0.05,
+    direction = "y"
+  )
+g
+```
+There needs to be two sets of geom_text_repel labels - one for the 2018 line and one for the 2019 line of values on the right. Now we add the right labels
+
+```{r}
+g <- g +
+  geom_text_repel(
+    data = ire.councils.18.19.subset %>% filter(year == "2019"),
+    aes(label = short) ,
+    hjust = "right",
+    fontface = "bold",
+    size = 2.5,
+    nudge_x = 0.35,
+    segment.size = 0.05,
+    direction = "y"
+  )
+
+g
+```
+We can see that we have all the elements of the slope plot.
+
+There is a long list of theme tweaks- such as removing the y axis text and title, removing gridlines, changing the background colour.
+
+```{r}
+g <- g +
+  
+  theme_bw() +
+  theme(panel.grid.minor.y = element_blank()) +
+  theme(panel.background = element_blank()) +
+  theme(panel.grid = element_blank()) +
+  theme(axis.ticks = element_blank()) +
+  theme(panel.border = element_blank()) +
+  theme(legend.position = "none") +
+  theme(axis.title.y = element_blank()) +
+  theme(axis.text.y  = element_blank()) +
+  
+  # Remove a few things from the x axis and increase font size
+  theme(axis.title.x  = element_blank()) +
+  theme(panel.grid.major.x = element_blank()) +
+  theme(axis.text.x.top = element_text(size = 10, face = "bold")) +
+  # Remove x & y tick marks
+  theme(axis.ticks = element_blank()) +
+  # Format title & subtitle
+  theme(plot.title = element_text(size = 14, face = "bold", hjust = 0.5)) +
+  theme(plot.subtitle = element_text(hjust = 0.5)) +
+  
+  labs(title = "Ireland County and City Council Transparency Indices 2018 vs 2019")
+
+g
+```
+We can immediately see several pieces of information. Most councils have improved their scores in 2019. All but two have positive slopes. Overall, the scores for 2019 are much better than for 2018. We can see that the last ranked council in 2019, Westmeath, scores much higher than the last ranked council in 2018.
+
+Two councils have noticeably strong positive slopes Galway County Council and Wexford County Council.
+
+Only two councils have lower scores in 2019, Galway City and Kerry County Council.
+
+### Comparing Rankings
+
+However, the slope of these lines represent the performance of each council without taking into account how other councils performed. In other words it doesn’t really say whether a council has improved its rank.
+
+While the ranking of each council is implicitly represented by its place on the 2018 and 2019 line, it would be useful to prioritise rank while also showing the percentage score. That way, the reader has a clear idea of how much a council has gained or dropped in rank in the interval
+
+A key point to notice here is that I will changed the y-axis scale from percentage to rank.
+
+That may not seem like a great change - but bear in mind that a council might have a slight increase in percentage but a significant drop in rank. For example, Westmeath County Council increased its score from 37% in 2018 to 40% in 2019. However, while the council was ranked 24th in 2018, it was ranked in joint last place in 2019.
+
+So changing the scale to rank is going to significantly change the message from this graph.
+
+The only change I need to make to the plot is to substitute the aesthetic mapping for the y-axis from percent to -rank. It needs to be minus rank as we want the rank values to be ordered in descending order from the bottom of the y axis. E.g. rank 1 value should be the highest value on the axis, rather than the lowest.
+
+```{r}
+library(ggplot2)
+library(ggrepel)
+
+
+g <-
+  ggplot(ire.councils.18.19.subset, aes(x = year, y = -rank, group = short)) +
+  
+  geom_line(size = 0.25, colour = "darkgrey") +
+  
+  scale_x_discrete(position = "top", expand = c(0.2, 0.2)) +
+  
+  geom_text_repel(
+    data = ire.councils.18.19.subset %>% filter(year == "2018"),
+    aes(label = short) ,
+    hjust = "left",
+    fontface = "bold",
+    size = 2.5,
+    nudge_x = -0.35,
+    segment.size = 0.05,
+    direction = "y"
+  ) +
+  
+  geom_text_repel(
+    data = ire.councils.18.19.subset %>% filter(year == "2019"),
+    aes(label = short) ,
+    hjust = "right",
+    fontface = "bold",
+    size = 2.5,
+    nudge_x = 0.35,
+    segment.size = 0.05,
+    direction = "y"
+  ) +
+  
+  geom_label(
+    aes(label = paste0(rank, " (", percent, "%)")),
+    size = 2.5,
+    label.padding = unit(0.085, "lines"),
+    label.size = 0.0
+  ) +
+  theme_bw() +
+  theme(panel.grid.minor.y = element_blank()) +
+  theme(panel.background = element_blank()) +
+  theme(panel.grid = element_blank()) +
+  theme(axis.ticks = element_blank()) +
+  theme(panel.border = element_blank()) +
+  theme(legend.position = "none") +
+  theme(axis.title.y = element_blank()) +
+  theme(axis.text.y  = element_blank()) +
+  
+  # Remove a few things from the x axis and increase font size
+  theme(axis.title.x  = element_blank()) +
+  theme(panel.grid.major.x = element_blank()) +
+  theme(axis.text.x.top = element_text(size = 10, face = "bold")) +
+  # Remove x & y tick marks
+  theme(axis.ticks = element_blank()) +
+  # Format title & subtitle
+  theme(plot.title = element_text(size = 14, face = "bold", hjust = 0.5)) +
+  theme(plot.subtitle = element_text(hjust = 0.5)) +
+  
+  labs(title = "Ireland County and City Council Transparency Indices 2018 vs 2019")
+
+
+g
+```
+This graph is far more interpretable. We can make statements like Galway County council has climbed 13 places to 18th place. Or more dramatically, Kerry County council has dropped from 9th place in 2018 to joint last place in 2019.
+
+### Colouring Slope lines
+
+A common approach in slope graphs is to colour lines depending on whether they have positive or negative slope. This allows the reader to immediately perceive the lines with negative slope and to get a sense of the proportion of positive to negative lines.
+
+To colour the lines, we have to first designate which lines are positive or negative. We create a new field in the data set, slope, which has a positive score if the slope is positive and negative score if it is negative
+
+```{r}
+## Calculate difference so as to colour slope lines
+ire.councils.18.19.subset <- ire.councils.18.19.subset %>%
+  group_by(short) %>%
+  mutate(slope = (rank[year == '2019'] - rank[year == '2018']))
+```
+
+```{r}
+library(ggplot2)
+library(ggrepel)
+
+slope_data <- ire.councils.18.19.subset
+
+colrs <- c('#1b9e77', '#d95f02')
+
+g <- ggplot(slope_data, aes(x = year, y = -rank, group = short)) +
+  
+  # colour the line based on whether slope > 0
+  geom_line(size = 0.25, aes(colour = slope > 0)) +
+  scale_colour_manual(values = colrs) +
+  
+  scale_x_discrete(position = "top", expand = c(0.2, 0.2)) +
+  
+  geom_text_repel(
+    data = slope_data %>% filter(year == "2018"),
+    aes(label = short) ,
+    hjust = "left",
+    fontface = "bold",
+    size = 2.5,
+    nudge_x = -0.35,
+    segment.size = 0.05,
+    direction = "y"
+  ) +
+  
+  geom_text_repel(
+    data = slope_data %>% filter(year == "2019"),
+    aes(label = short) ,
+    hjust = "right",
+    fontface = "bold",
+    size = 2.5,
+    nudge_x = 0.35,
+    segment.size = 0.05,
+    direction = "y"
+  ) +
+  
+  geom_label(
+    aes(label = paste0(rank, " (", percent, "%)")),
+    size = 2.5,
+    label.padding = unit(0.085, "lines"),
+    label.size = 0.0
+  ) +
+  theme_bw() +
+  theme(panel.grid.minor.y = element_blank()) +
+  theme(panel.background = element_blank()) +
+  theme(panel.grid = element_blank()) +
+  theme(axis.ticks = element_blank()) +
+  theme(panel.border = element_blank()) +
+  theme(legend.position = "none") +
+  theme(axis.title.y = element_blank()) +
+  theme(axis.text.y  = element_blank()) +
+  
+  # Remove a few things from the x axis and increase font size
+  theme(axis.title.x  = element_blank()) +
+  theme(panel.grid.major.x = element_blank()) +
+  theme(axis.text.x.top = element_text(size = 10, face = "bold")) +
+  # Remove x & y tick marks
+  theme(axis.ticks = element_blank()) +
+  # Format title & subtitle
+  theme(plot.title = element_text(size = 14, face = "bold", hjust = 0.5)) +
+  theme(plot.subtitle = element_text(hjust = 0.5)) +
+  
+  labs(title = "Ireland County and City Council Transparency Indices 2018 vs 2019")
+g
+```
+
+### Foregrounding a subset of slope lines
+
+Now, let’s assume that this visualisation has been designed as part of a discussion piece around the proposed merger of Galway City and County council. A point of contention in any merger might be the contrasting results of the the two councils.
+
+As such, let’s revise this graph to foreground the Galway councils, while keeping the background slopes visible.
+
+To create the background colours, colour the lines with a duplicate palette of colours that have have been slightly desaturated and have alpha reduced.
+
+Then add a geom_line for Galway and for Galway City. Colour these lines with the the original full alpha colours.
+
+```{r}
+library(ggplot2)
+library(ggrepel)
+library(grDevices)
+library(colorspace)
+
+
+slope_data <- ire.councils.18.19.subset
+
+colrs <- c('#1b9e77', '#d95f02')
+colrs2 <- desaturate(colrs,0.3)
+colrs_faded <- adjustcolor(colrs2, alpha.f = 0.3)
+
+g <- ggplot(slope_data, aes(x = year, y = -rank, group = short)) +
+  # faded background
+  geom_line(size = 0.25, aes(colour = slope > 0)) +
+  scale_colour_manual(values = colrs_faded) +
+  
+  # foreground has non-faded colours and slightly thicker lines
+  geom_line(
+    data = slope_data %>%
+      filter(short == "Galway"),
+    size = 0.6,
+    colour = colrs[1]
+  ) +
+  geom_line(
+    data = slope_data %>%
+      filter(short == "Galway City"),
+    size = 0.6,
+    colour = colrs[2]
+  )  +
+  
+  scale_x_discrete(position = "top", expand = c(0.2, 0.2)) +
+  
+  geom_text_repel(
+    data = slope_data %>% filter(year == "2018"),
+    aes(label = short) ,
+    hjust = "left",
+    fontface = "bold",
+    size = 2.5,
+    nudge_x = -0.35,
+    segment.size = 0.05,
+    direction = "y"
+  ) +
+  
+  geom_text_repel(
+    data = slope_data %>% filter(year == "2019"),
+    aes(label = short) ,
+    hjust = "right",
+    fontface = "bold",
+    size = 2.5,
+    nudge_x = 0.35,
+    segment.size = 0.05,
+    direction = "y"
+  ) +
+  
+  geom_label(
+    aes(label = paste0(rank, " (", percent, "%)")),
+    size = 2.5,
+    label.padding = unit(0.085, "lines"),
+    label.size = 0.0
+  ) +
+  theme_bw() +
+  theme(panel.grid.minor.y = element_blank()) +
+  theme(panel.background = element_blank()) +
+  theme(panel.grid = element_blank()) +
+  theme(axis.ticks = element_blank()) +
+  theme(panel.border = element_blank()) +
+  theme(legend.position = "none") +
+  theme(axis.title.y = element_blank()) +
+  theme(axis.text.y  = element_blank()) +
+  
+  # Remove a few things from the x axis and increase font size
+  theme(axis.title.x  = element_blank()) +
+  theme(panel.grid.major.x = element_blank()) +
+  theme(axis.text.x.top = element_text(size = 10, face = "bold")) +
+  # Remove x & y tick marks
+  theme(axis.ticks = element_blank()) +
+  # Format title & subtitle
+  theme(plot.title = element_text(size = 14, face = "bold", hjust = 0.5)) +
+  theme(plot.subtitle = element_text(hjust = 0.5)) +
+  
+  labs(title = "Ireland County and City Council Transparency Indices 2018 vs 2019")
+g
+```
+
+This plot brings to the foreground that message that both councils were at opposite ends of the scale in 2018 - but it could be argued that they are converging. The City council dropped 9 places in 2019 and the County Council rose from last place in 2018 to 18th place in 2019. The City council’s lost of places is more dramatic - if you compare it to the performance of its peers in 2018. Of the top 5 in 2018, only Dublin City Council dropped a place from 4th to 5th. While Galway County Council increased its ranking from last place to 18th place, we can also see that the second last ranked county council in 2018, Wexford, increased its rank to joint 5th place in 2019 - a much better improvement that Galway’s county council’s.
+
+The slope graph is a very simple but powerful graph for showing how rankings change over time. It is not just limited to two axis. When transparency Ireland publish their figures for 2020, I will update this graph with a third axis to represent 2020 values.
+
+###  Labelling issues
+
+However, there are some drawbacks. Labelling is an issue where there are multiple categories with the same value. Here I’ve used the ggrepel library to labels points like this. This introduces label line segments on the left and on the right of the graph. And this is not as directly readable as labelling the position on the axis directly. For example, look at the point shared by the county councils of Wicklow and Mayo in 2018. We can see that there is a positive and negative slope line leaving this point - but which county council does either line refer to? We can only find out by following the lines. In this case, we can see that the negative slopped line applies belongs to Mayo and the positive slopped line to Wicklow
+
+Edward Tufte addressed this problem by placing points with the same value one below the other on the axis. You can see an example in the lectures notes. However this really only works for two points with equal values.
+
+If you have several points with the same value, such as the 5th ranked councils in 2019, there may not be enough room on the y-axis scale to accommodate a list of points with the same value As such, the ggrepel labelling approach is probably the best approach.
