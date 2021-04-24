@@ -1,0 +1,187 @@
+---
+title: "Fre ploygon and density plots"
+output: html_notebook
+---
+
+### Data
+
+In the r code below, I create a sythetic data set of height values for men and women based on the following statistics
+
+Male irish mean height 179 cm with SD 7.6 cm
+Female irish mean height 164 cm with SD 7.2 cm
+
+```{r}
+library(knitr)
+library(kableExtra)
+
+set.seed(12566)
+
+height_range <- seq(80, 240, by = 1)
+
+# Male irish  mean height 179 cm with SD  7.6 cm
+male_height <- round(rnorm(height_range, mean = 179, sd = 7.6),2)
+# Female irish  mean height 164 cm with SD 7.2 cm
+female_height <- round(rnorm(height_range, mean = 163, sd = 7.2),2)
+
+m<- factor(c("male","female"))
+
+male <- rep(m[1],length(height_range))
+female <- rep(m[2],length(height_range))
+
+m_height<-data.frame(male_height,male)
+names(m_height) <- c("height", "gender")
+f_height<-data.frame(female_height,female)
+names(f_height) <- c("height", "gender")
+
+heights<- rbind(m_height, f_height)
+
+
+#calculate means for the male and female cohort
+library(plyr)
+mu <- ddply(heights, "gender", summarise, grp.mean=mean(height))
+
+kable(heights) %>%
+  kable_styling( full_width = F)%>%
+  scroll_box(height = "300px")
+```
+### Summarise the data into intervals
+
+```{r}
+bin_width <- 5
+bin_breaks <- seq(140, 200, bin_width)
+
+height_table<-as.data.frame(table(cut(heights$height, breaks=bin_breaks)))
+
+colnames(height_table) <-c("Height_Range", "Count")
+
+colnames(height_table) <-c("Height_Range", "Count")
+
+kable(height_table) %>%
+  kable_styling( full_width = F)
+```
+
+The hist function is a more efficient way of summarising values into intervals. I have used the cut function above because it provides the inteval in ( ] form whuhc I could show in a table. However, the output of hist has the same information and more, including mid point of intervals.
+
+```{r}
+height_hist2<-hist(heights$height, breaks = bin_breaks, plot = FALSE)
+```
+
+### Histograms
+
+The first histogram just summarises the height values in the data set
+
+The bin width is set to 3.
+
+Note how I have added the mean line using the geom_vline function
+
+Try this with a higher bin width and describe the change in terms of how the distribution is summarised
+
+```{r}
+bin_width <- 3
+bin_breaks <- seq(140, 200, bin_width)
+
+
+library(ggplot2)
+ggplot(heights, aes(x=height)) + 
+  
+  geom_histogram(binwidth=bin_width, 
+                 fill = "steelblue3", col = "white", 
+                 position="identity", stat="bin",
+                 breaks=bin_breaks, 
+                 closed="right") +
+  
+  scale_x_continuous(expand=c(0,0), breaks = bin_breaks)+
+  theme_minimal()+
+  theme(legend.position="top") +
+  theme(panel.grid.minor.y = element_blank(),
+        panel.grid.major.x = element_blank(),
+        panel.grid.minor.x = element_blank(),
+        plot.margin = margin(t = 2, r = 10, b = 2, l = 2, "pt"))
+```
+
+### Frequency Polygon
+
+An alternative to the histogram is the frequency polygon, which instead of using bars uses a line that traces the frequency value of each interval. The x=axis value for each interval is its midpoint.
+
+As with the histogram you can control the bin width for the frequency polygon. A larger bin width smooths the polygon.
+
+Frequency polygons are a graphical device for understanding the shapes of distributions. They serve the same purpose as histograms, but are better able to visualise simultaneous plotting of multiple distribution
+
+The plot below of a frequency polygon on top of a histogram is for illustration purposes only.
+
+
+```{r}
+library(ggplot2)
+ggplot(heights, aes(x = height)) +
+  geom_histogram(
+    binwidth = bin_width,
+    fill = "grey",
+    alpha = 0.5,
+    col = "white",
+    position = "identity",
+    stat = "bin",
+    breaks = bin_breaks,
+    closed = "right"
+  ) +
+  
+  geom_freqpoly(
+    binwidth = bin_width,
+    colour = "steelblue3",
+    stat = "bin",
+    breaks = bin_breaks,
+    closed = "right"
+  ) +
+  
+  scale_x_continuous(expand = c(0, 0), breaks = seq(130, 200, by = 5)) +
+  theme_minimal() +
+  theme(legend.position = "top") +
+  theme(
+    panel.grid.minor.y = element_blank(),
+    panel.grid.major.x = element_blank(),
+    panel.grid.minor.x = element_blank(),
+    plot.margin = margin(
+      t = 2,
+      r = 10,
+      b = 2,
+      l = 2,
+      "pt"
+    )
+  )
+```
+```{r}
+library(ggplot2)
+
+ggplot(heights, aes(x=height)) + 
+  
+ geom_freqpoly(binwidth=bin_width, 
+               colour = "steelblue3",
+               stat="bin", 
+               breaks=bin_breaks, 
+               closed="right") +
+
+  scale_x_continuous(expand=c(0,0), breaks = seq(130,200, by=5)) +
+  theme_minimal()+
+  theme(legend.position="top") +
+  theme(panel.grid.minor.y = element_blank(),
+        panel.grid.major.x = element_blank(),
+        panel.grid.minor.x = element_blank())
+```
+### Density Plot
+```{r}
+library(ggplot2)
+
+ggplot(heights, aes(x=height)) + 
+  
+  geom_density(fill = "steelblue3", 
+               col = "steelblue4", 
+               bw = 1.5) +
+  
+  scale_x_continuous(expand=c(0,0), breaks = seq(130,200, by=5)) +
+  theme_minimal() +
+  theme(panel.grid.minor.y = element_blank(),
+        panel.grid.major.x = element_blank(),
+        panel.grid.minor.x = element_blank())
+```
+### Sources:
+
+https://ggplot2.tidyverse.org/reference/geom_boxplot.html https://ggplot2.tidyverse.org/reference/geom_violin.html http://www.sthda.com/english/wiki/ggplot2-violin-plot-quick-start-guide-r-software-and-data- https://www.r-graph-gallery.com/ridgeline-plot/ https://cran.r-project.org/web/packages/ggridges/vignettes/introduction.html https://homepage.divms.uiowa.edu/~luke/classes/STAT4580/boxetc.html#ridgeline-plots
