@@ -1,0 +1,732 @@
+---
+title: "Comparing two distributions"
+output: html_notebook
+---
+
+### Data
+
+This is the same data set of male and female heights that we used in the last chapter. In this chapter we will focus on creating plots that allow us to compare and contrast the separate male and female height distributions
+
+```{r}
+library(knitr)
+library(kableExtra)
+
+set.seed(12566)
+
+height_range <- seq(80, 240, by = 1)
+
+# Male irish  mean height 179 cm with SD  7.6 cm
+male_height <- round(rnorm(height_range, mean = 179, sd = 7.6),2)
+# Female irish  mean height 164 cm with SD 7.2 cm
+female_height <- round(rnorm(height_range, mean = 163, sd = 7.2),2)
+
+m<- factor(c("male","female"))
+
+male <- rep(m[1],length(height_range))
+female <- rep(m[2],length(height_range))
+
+m_height<-data.frame(male_height,male)
+names(m_height) <- c("height", "gender")
+f_height<-data.frame(female_height,female)
+names(f_height) <- c("height", "gender")
+
+heights<- rbind(m_height, f_height)
+
+
+#calculate means for the male and female cohort
+library(plyr)
+mu <- ddply(heights, "gender", summarise, grp.mean=mean(height))
+```
+
+
+### Using histograms to represent two distributions
+
+```{r}
+bin_width <- 3
+bin_breaks <- seq(140, 200, bin_width)
+```
+
+###  Stacked histograms - Avoid!
+
+This histogram shows the distributions in the dataset separated according to the gender variable. We use the colour aesthetic to visualise male and female heights.
+
+This requires very little modification to our existing histogram. Here we created a stacked histogram.
+
+Before we accept this as the way to go, let’s critique it. As with stacked bar charts, the problem is that it is not immediately clear that the bar on top is actually stacked on the lower bar.
+
+If we perceive that the green bars are behind the blue bars then, we will misinterpret the graph’s message believing that women are more women than men in the height range 170 to 180 cm, when the opposite is true.
+
+```{r}
+library(ggplot2)
+
+ggplot(heights, aes(x=height, fill= gender)) + 
+  
+  geom_histogram(binwidth=bin_width, 
+                 col = "white", 
+                 position="stack", stat="bin",
+                 breaks=bin_breaks, 
+                 right=TRUE) +
+  
+  scale_x_continuous(expand=c(0,0), breaks = bin_breaks )+
+  scale_fill_manual(values= c("#66c2a5","#8da0cb")) +
+  theme_minimal()+
+  theme(legend.position="top") +
+  theme(panel.grid.minor.y = element_blank(),
+        panel.grid.major.x = element_blank(),
+        panel.grid.minor.x = element_blank(),
+        legend.title = element_blank(),
+         plot.margin = margin(t = 2, r = 10, b = 2, l = 2, "pt"))
+```
+### Overlapping histograms - avoid
+
+A possible alternative is the overlapping histogram. The problem is the overlap - in order to see the one histogram behind the other, the alpha value of the front histogram has to be very low, and even then, colour blending will mean that the overlap will show as a much darker colour.
+
+Here I’ve made the fill white with 0 alpha. The border colours of each histogram outline the bars – but where they overlap only the top of one of the bars may be visible. While we can trace the outline of each distribution – it’s not easy to do. Furthermore, even though there is no fill, readers may assume that this is stacked histogram and misinterpret the message completely.
+
+For that reason, I tend to avoid using overlapping histograms
+
+```{r}
+library(ggplot2)
+
+ggplot(heights, aes(x=height, colour= gender)) + 
+  
+  
+   geom_histogram(binwidth=bin_width, 
+                 fill = "white", alpha = 0.0, 
+                 position="identity", stat="bin",
+                 breaks=bin_breaks, 
+                 right=TRUE) +
+  
+  scale_x_continuous(expand=c(0,0), breaks = bin_breaks )+
+  scale_colour_manual(values= c("#66c2a5","#8da0cb")) +
+  theme_minimal()+
+  theme(legend.position="top") +
+  theme(panel.grid.minor.y = element_blank(),
+        panel.grid.major.x = element_blank(),
+        panel.grid.minor.x = element_blank(),
+        panel.grid.major.y=element_line(size=0.2),
+        legend.title = element_blank(), 
+        plot.margin = margin(t = 2, r = 10, b = 2, l = 2, "pt"))
+```
+
+### Faceted histograms
+
+Facetting offers a decent alternative. Both histograms share the x-axis and it easy to see and compare the value ranges of each distribution
+
+Note how the plot has been faceted on the gender variable using the facet_grid function
+
+```{r}
+ggplot(heights, aes(x=height, fill =gender)) + 
+  
+   geom_histogram(binwidth=bin_width, 
+                col = "white", 
+                 position="identity", stat="bin",
+                 breaks=bin_breaks, 
+                 right=TRUE) +
+  
+  scale_x_continuous(expand=c(0,0), breaks = bin_breaks ) +
+  
+  scale_fill_manual(values = c("#66c2a5","#8da0cb"), guide = "none")+
+  
+  facet_grid(gender ~ .) +
+  
+  theme_minimal()+
+  theme(
+    legend.position="none"
+    ) +
+  
+  theme(panel.grid.minor.y = element_blank(),
+        panel.grid.major.x = element_line(size=0.2),
+        panel.grid.minor.x = element_blank(),
+        panel.grid.major.y=element_line(size=0.2))
+```
+### Pyramid Charts
+
+In this plot we put the two histograms together so that they physically share an axis. This is quite a good solution when comparing just two distributions – as it clearly illustrates the shape and range of the distribution and gives a good sense of the proportion of male to female values within each interval .
+
+We have to construct this plot in ggplot. There is not pre-given histogram plot of type pyramid.
+
+We use the hist value in R to divide up the height values into bins and to count the number of instances that fall into each bin.
+
+We then create a new data frame that contains the male and female counts in each bin.
+
+```{r}
+library(dplyr)
+library(tidyr)
+
+
+male_hist<- hist(filter(heights, gender == "male")$height, 
+                 breaks = bin_breaks, 
+                 plot = FALSE)
+
+female_hist<-hist(filter(heights, gender == "female")$height, 
+                  breaks = bin_breaks, 
+                  plot = FALSE)
+
+f_m_heights<- data.frame(height = male_hist$mids,
+           male = male_hist$counts,
+           female = female_hist$counts)%>%
+          gather(gender, count, -height)
+
+f_m_heights$gender <- factor(f_m_heights$gender, levels = c("female", "male"))
+
+# since a recent update to ggplot, this plot will not work unless the a x-axis is discrete. Probably makes sense
+
+f_m_heights$height <- factor(f_m_heights$height, levels = unique(f_m_heights$height))
+```
+
+Here is the clever bit.
+
+We plot this data as a bar graph – but we tell ggplot to consider the male values to be negative and the female values to be positive. This places the males values to the left of the 0 value and the female values to the right of the 0 value on the y-axis (which has been flipped)
+
+We then over write the labels so that display positive values.
+
+```{r}
+# male count values will be represented by negative values on the (flipped y axis)
+ggplot(f_m_heights, aes(x = height, y = ifelse(gender == "male",-1, 1)*count, fill = gender)) + 
+  geom_col() +
+   scale_x_discrete(name = "height (cm)", expand = c(0, 0)) +
+   scale_y_continuous(name = "count of people", breaks = 5*(-5:6), 
+                     labels = c(seq(25,0, by=-5),seq(5,30, by=5)) ) +
+   scale_fill_manual(values = c("#66c2a5","#8da0cb"), guide = "none") +
+   annotate("text", x = 21, y = -20, label = "male", hjust = 0) +
+   annotate("text", x = 21, y = 12, label = "female", hjust = 0) +
+   coord_flip(clip = "off") +
+
+   theme_minimal() +
+  
+  theme(axis.title.x = element_text(hjust = 0.61),
+        axis.text.y=element_text(size = 8)) +
+
+theme(panel.grid.minor.y = element_blank(),
+        panel.grid.major.x = element_line(size=0.2),
+        panel.grid.minor.x = element_blank(),
+        panel.grid.major.y=element_line(size=0.2))
+```
+### Age Pyramid Ireland 2019
+
+This type of plot is often know as a population pyramid and is commonly used to provide a visualisation of the age distribution of entire countries. This is the population pyramid for Ireland in 2019 based on figures from the central statistics office.
+
+
+
+###  The barley yield data set
+
+
+This is an agricultural data set popularised by William Cleveland in his 1993 text Visualizing Data. The original data was presented in a paper by Immer et al. (1934)
+
+Immer, R. F. and H. K. Hayes and LeRoy Powers. (1934). Statistical Determination of Barley Varietal Adaptation. Journal of the American Society of Agronomy, 26, 403-419.
+
+```{r}
+library(lattice)
+library(knitr)
+library(kableExtra)
+
+kable(head(barley))%>% kable_styling()
+```
+
+### Multiple density plots
+
+
+The smoothing used by the density plot makes it easier for your eye to trace the outline of the curves.
+
+This allows for the inclusion of multiple distribution curves on one plot.
+
+The example below is still too crowded but the distributions are mostly separable.
+
+I don’t think a legend would have helped here, so I have labelled each curve directly. I calculate the max density value for each curve and then attach a geom_text_repelgeom to that point. This creates coloured text labels for each curve attached to their maximum density value.
+
+```{r}
+library(colorspace)
+library(ggrepel)
+library(dplyr)
+
+
+# compute densities for yields
+barley_dens <- group_by(barley, site) %>%
+  do(ggplot2:::compute_density(.$yield, NULL)) %>%
+  dplyr::rename(yield = x)
+
+# get the maximum values. This is point the labe will point to
+barley_max <- filter(barley_dens, density == max(density)) %>%
+  ungroup() %>%
+  mutate(
+    hjust = c(1, 1.5, 0, -2, -1,-2),
+    vjust = c(-1.5, -2, -1.0, -2.5, -1.0, 1.5)
+  )
+
+
+
+ggplot(barley) + 
+  geom_density(aes(x = yield, color = site, fill=site), alpha=0.2) +
+  
+  geom_text_repel(
+    data = barley_max,
+    aes(
+      label = site, hjust = hjust, vjust = vjust,
+      color = site,
+      x = yield,
+      y = density 
+    ),
+    inherit.aes = FALSE,
+    size = 10/.pt, min.segment.length = unit(0.0, 'lines'), segment.size = 0.2
+  ) 
+```
+```{r}
+library(lattice)
+library(colorspace)
+library(ggrepel)
+
+ggplot(barley) + 
+  geom_density(aes(x = yield), alpha=0.5) +
+  
+  
+  theme_minimal() +
+  
+  theme(panel.grid.minor.y = element_blank(),
+        panel.grid.major.x = element_line(size = 0.2),
+        panel.grid.minor.x = element_blank(),
+        panel.grid.major.y = element_blank()) +
+  
+  facet_wrap(~site)
+```
+```{r}
+library(lattice)
+library(colorspace)
+library(ggrepel)
+
+cols2<- c("#ca0020","#0571b0")
+
+ggplot(barley) + 
+  geom_density(aes(x = yield, fill = year, colour = year),  alpha=0.3) +
+  
+  
+scale_fill_manual(values=cols2, name = "Year") +
+  
+  scale_x_continuous(expand=c(0,0))+
+  
+  scale_y_continuous(position = "right", breaks = c(0,0.05, 0.10,0.15))+
+ 
+ theme_minimal() +
+  
+  theme(panel.grid.minor.y = element_blank(),
+        panel.grid.major.x = element_line(size = 0.2),
+        panel.grid.minor.x = element_blank(),
+        panel.grid.major.y = element_blank(),
+        strip.text.y = element_text(size = 8,angle=180, hjust = 0.0),
+        axis.text.y = element_text(size = 6),
+        legend.title = element_blank(), 
+        plot.margin = margin(t = 4, r = 10, b = 4, l = 20, "pt"))+
+  
+  facet_grid(rows = vars(site),switch="y")
+```
+
+### Plotting Individual Values
+
+Despite their popularity, histograms, frequency polygons and density plots fall short in a few ways:
+
+They don’t show the distribution’s central tendency
+They only provide an approximate measure of spread, for they don’t give * us the lowest and highest values precisely
+They don’t identify outliers or provide their precise values
+
+### Plotting individual points: Strip plots
+
+Another distribution graph, called a strip plot, does not conventionally group values into intervals at all, but instead displays each value positioned along a single quantitative scale. A strip plot is very simple - but powerful way to present the data values without the loss of detail entailed by summarisation methods.
+
+A potential downside of the strip plot is the fact that it doesn’t show the shape of the distribution nearly as well as histograms and frequency polygons. But it show the actual data points - not a summary and in some situations that is preferable
+
+Another potential problem with the strip plot in this example is over-plotting. This problem can be alleviated by changing the alpha value of the points and using a jitter function, as I have done here.
+
+Jittering adds a small amount of random noise to each point. You can achieve this using the geom_jitter or geom_point (position = jitter). The limit of the random noise is represented by the width and height attributes.
+
+In this plot I mark the first, second and third quartile points. The first quartile is the value below which there is 25% of the data. For example, 25% of the height values are less than the first quartile value. The second quartile value, is also known as the median, is the value at which there are exactly 50% of values below it and 50% of values above it in the data set. 75% of the values in the data set are less than the value indicated by the third quartile. 50% of the data lies between quartile 1 and quartile 3; this is known as the inter-quartile range - and is a good indicator of the middle range spread of the data.
+
+The values represented at each quartile must be calculated.
+
+The r quantile function will do this. It produces 5 values. q[2] gives the quartile 1 value. q[3] gives the quartile 2 (the median) value. q[4] gives the quartile 3 value. q[1] gives the minimum data value. q[5] gives the maximum data value.
+```{r}
+heights2 <- heights
+
+q <-quantile(heights$height) 
+
+q
+```
+
+
+```{r}
+jitter <- position_jitter(width = 0.1, height = 0.1)
+
+ggplot(heights, aes(x=height, y=gender)) +
+  
+ geom_segment(aes(x = q[2], y = 0, xend = q[2], yend = 2.5), linetype="dashed", size = 0.05, alpha = 0.3) + 
+  
+  geom_segment(aes(x = q[3], y = 0, xend = q[3], yend = 2.5), linetype="dashed", size = 0.05,alpha = 0.3) +
+  
+  geom_segment(aes(x = q[4], y = 0, xend = q[4], yend = 2.5), linetype="dashed", size = 0.05, alpha = 0.3) +
+  
+   annotate(geom="text", x= q[2], y =2.7, label = "Q1", size = 2.6,  colour = "black") +
+  
+   annotate(geom="text", x= q[3], y =2.7, label = "Median", size = 2.6, colour = "black") +
+  
+  annotate(geom="text", x= q[4], y =2.7, label = "Q3", size = 2.6, colour = "black") +
+  
+  geom_point(aes(col=gender), alpha=0.3, size = 1.5, show.legend=F, position = jitter) +
+  
+  
+  scale_y_discrete(expand=c(0,0))+
+  scale_x_continuous(breaks=seq(140,200, by =10))+
+  
+  scale_colour_manual(values = c("#66c2a5", "#8da0cb")) +
+  
+  coord_fixed(ratio=5, clip = "off") +
+  
+  xlab("centimetres") +
+  
+  theme_classic() +
+
+theme(
+  axis.text.y = element_text(size =10,face = "bold"),
+  axis.ticks.y =  element_blank(),
+  axis.title.y = element_blank(),
+  axis.title.x = element_text(size=9),
+  axis.line.x = element_blank(),
+  axis.ticks.x = element_blank(),
+  axis.line.y = element_blank()
+  
+)
+```
+### Plotting individual points: Quantile plots
+
+A quantile plot also displays individual values but does so in a way that reduces the over-plotting problem. Quantile plots order the data points in ascending order of value, typically on the x axis. From left ot right each values on the x-axis represents the order value of the point . The lowest value point is represented by x-axis value 1, the second lowerst value by x-axis value 2 and so on.
+
+The plot includes lines to represent Quartile 1, Median and Quartile 3. A quantile plot is limited in the number of values that it can contain compared to a strip plot. You can only place so many dots next to one another in the limited space of a page or screen. Ideally, you should be able to see the individual points. In this case, even with jitter and a low alpha, there is a still quite a bit of overplotting .
+
+To create a quantile plot you first order the height values in ascending order. You then assign each point a rank. 1 for the lowest value, 2 for the second lowest and so on.
+
+Then you plot the height values (typically on the y-axis) against the rank values (on the x-axis).
+
+The height values represented at each quartile must be calculated. The r quantile function will do this.
+
+However, we need to show these as lines intersecting the x-axis, so we also need to calculate the rank value (on the x-axis) at which each of these quartile values is calculated.
+
+```{r}
+heights2<-heights
+
+#order the data you want to plot in ascending order
+heights_ordered<- heights2[order(heights2$height),]
+
+# create an order field indicating the rank of each point
+order <- seq(from =1, to =nrow(heights_ordered), by= 1)
+
+heights_ordered$order = order
+
+# calculate the x-axis intercept
+#  the intercepts calculated below indicate the rank (x-axis value) of the point where each quartile value occurs
+#  these are the x-axis intercepts that will be drawn by a vertical line
+# note that the code heights_ordered$height <= q[2] produces a logical vector. Summing that vector gives a count of the number of TRUE values
+q1_intercept <- sum(heights_ordered$height <= q[2])
+med_intercept <- sum(heights_ordered$height <= q[3])
+q3_intercept <- sum(heights_ordered$height <= q[4])
+```
+
+```{r}
+library(ggplot2)
+library(colorspace)
+
+jitter <- position_jitter(width = 0.3, height = 0.4)
+
+ggplot(heights_ordered, aes(x=order, y = height)) + 
+ 
+  geom_segment(aes(x = q1_intercept, y = 0, xend = q1_intercept, yend = 200), linetype="dashed", size = 0.05, colour = "darkgrey") +
+  
+  geom_segment(aes(x = med_intercept, y = 0, xend = med_intercept, yend = 200), linetype="dashed", size = 0.05,colour = "darkgrey") +
+  
+  geom_segment(aes(x = q3_intercept, y = 0, xend = q3_intercept, yend = 200), linetype="dashed", size = 0.05,colour = "darkgrey") +
+  
+    geom_text(aes(x=q1_intercept, label="Quartile 1", y=202), colour="black", size= 3) +
+    geom_text(aes(x=med_intercept, label="Median", y=202), colour="black",size= 3) +
+    geom_text(aes(x=q3_intercept, label="Quartile 3", y=202), colour="black", size= 3) +
+  
+  geom_point(shape=21,  
+             size = 1.3, 
+             alpha = 0.2,  
+             position = jitter, 
+             aes(fill=gender, colour = gender)) +
+  
+  
+  scale_fill_manual(values= c("#ca0020","#0571b0")) +
+  
+  scale_y_continuous(breaks = bin_breaks)+
+ 
+   coord_cartesian(ylim = c(145, 200)) +
+  theme_minimal() +
+  
+  theme(panel.grid.minor.y = element_blank(),
+        panel.grid.major.x = element_blank(),
+        panel.grid.minor.x = element_blank(),
+        panel.grid.major.y = element_line(size = 0.2),
+        axis.text.y = element_text(size = 6),
+        axis.text.x = element_blank(),
+        axis.title.x = element_blank(),
+        legend.title = element_blank(), 
+        plot.margin = margin(t = 4, r = 10, b = 4, l = 20, "pt"))
+```
+### Summarising Percentile and Quartile Values
+
+###Strip Percentile Plot
+Strip percentile plot summarises the data into its percentile values. A percentile is a measure indicating a value below which a percentage of the values in the data set fall. For example, the tenth percentile is the height values below which 10% of the values in the data set occur. The first quartile is otherwise known as the 25th percentile and the media is the 50th percentile.
+
+The percentile plot below shows a single plot for a single category.
+
+Before data can be visualised using a strip percentile plot, the values represented at each percentile must be calculated.
+
+The r quantile function will do this. In the example below, percentile values are calculated from 10% to 100%
+
+The data preprocessing code:
+
+```{r}
+library(dplyr)
+
+m_heights<-filter(heights, gender == "male")
+#calculate the perentile values from 10 to 100%
+q_male <-quantile(m_heights$height, seq(from = 0.0, to = 1.0, by= 0.1))
+# make a dataframe
+q_male_df<-data.frame(q_male)
+# turn the row name column (which is a percent) into a data column
+q_male_df$percentile <- rownames(q_male_df) 
+# set the colnames
+colnames(q_male_df)<- c("height", "percentile")
+
+head(q_male_df, 10)
+```
+```{r}
+ggplot(q_male_df, aes(x=height, y="ALL")) + 
+  
+  # plot segment line first so that geom_point covers the start of the loine
+  geom_segment(aes(x=height, y="ALL", xend=height, yend=0), size = 0.05)+
+  geom_point(alpha=1, col="steelblue4", size = 3) +
+  
+geom_text(aes(label=percentile), size=3, nudge_y = 0.2) + # percentile label
+  coord_fixed(ratio=4)+ # limits the size of the plot
+  
+  scale_x_continuous(breaks= q_male_df$height, labels = round(q_male_df$height,0),   limits = c(min(q_male_df$height), max(q_male_df$height)), name = "centimetres")+
+  
+  # yellow dotted line to illustrate what percent have height < 180 
+  #geom_segment(y=0, yend=1, x=180, xend=180, size=.25, col="darkgoldenrod3", alpha=0.6, linetype="dashed")+
+  
+  theme_classic() +
+   ggtitle("Male Height Percentiles") +
+
+theme(
+  axis.line.y = element_blank(), 
+  axis.text.y = element_blank(),
+  axis.ticks.y =element_blank(),
+  axis.title.y = element_blank(),
+  plot.title = element_text(size = 10, hjust = 0.5),
+  axis.line.x = element_line(size=0.25, colour="black"),
+  axis.title.x = element_text(size=9),
+  axis.ticks.x=element_blank(),
+  plot.margin = margin(t = 2, r = 2, b = 2, l = 2, "pt")
+)
+```
+While the strip percentile plot is very simple indeed, it gives us a lot of information about the distribution of male height values. We can immediately make statements like “10% of males are taller than 189 cm” (It must be a land of giants). We can see that while most of the percentile intervals are have a narrow range of 3 or 4 cm. However, the first and last intervals are noticeably larger. This may be source of concern. I would interpret this large interval to be caused by outliers - values that are unusually small or large.
+
+One approach, in keeping with the simplicity of the strip plot, is to combine the standard strip plot with the percentile plot version. What we hope to achieve is the simple summary features of the percentile plot with the detail abut the actual range an values of the standard strip plot.
+
+
+```{r}
+jitter <- position_jitter(width = 0.1, height = 0.1)
+
+ggplot(m_heights, aes(x=height, y="ALL")) + 
+  
+  # plot segment line first so that geom_point covers the start of the loine
+  geom_segment(data = q_male_df, aes(x=height, y="ALL", xend=height, yend=0), size = 0.05, inherit.aes = F)+
+  geom_point(alpha=0.25, col="steelblue4", size = 1.5) +
+  
+ geom_text(data = q_male_df, aes(x=height, y="ALL", label=percentile), size=3, nudge_y = 0.2,inherit.aes = F) + # percentile label
+  
+ coord_fixed(ratio=4, clip = "off") + # limits the size of the plot
+  
+  scale_x_continuous(breaks= q_male_df$height, labels = round(q_male_df$height,0),    limits = c(min(q_male_df$height), max(q_male_df$height)), name = "centimetres")+
+  
+  theme_classic() +
+   ggtitle("Male Height Percentiles") +
+
+theme(
+  axis.line.y = element_blank(), 
+  axis.text.y = element_blank(),
+  axis.ticks.y =element_blank(),
+  axis.title.y = element_blank(),
+  plot.title = element_text(size = 10, hjust = 0.5),
+  axis.line.x = element_line(size=0.05, colour="black"),
+  axis.title.x = element_text(size=9),
+  axis.ticks.x=element_blank(),
+   plot.margin = margin(t = 2, r = 2, b = 2, l = 2, "pt"),
+ 
+)
+```
+
+### Strip Percentile Plot: Two categories
+
+The simplicity of the strip percentile plot makes it useful for comparing two distributions. As with the single category version above, you have calculate the percentile values for each distribution you wish to show. Then, using geom_sement you connect the percentiles in each strip.
+
+We want to be able to compare distributions per percentile, so that we can say things like “90% of males are taller than 167 cm, while only 30% of females are taller than 167 cm”
+
+The data preprocessing code:
+
+```{r}
+library(dplyr)
+library(grid)
+
+
+m<-filter(heights, gender == "male")
+f<-filter(heights, gender == "female")
+
+q_male <-quantile(m$height, seq(from = 0.0, to = 1.0, by= 0.1))
+q_female <-quantile(f$height, seq(from = 0.0, to = 1.0, by= 0.1))
+
+q_male_df<-data.frame(q_male)
+q_male_df$percentile <- rownames(q_male_df) 
+colnames(q_male_df)<- c("height", "percentile")
+q_male_df$gender <- rep("m",nrow(q_male_df))
+
+q_female_df<-data.frame(q_female)
+q_female_df$percentile <- rownames(q_female_df) 
+colnames(q_female_df)<- c("height", "percentile")
+q_female_df$gender <- rep("f",nrow(q_female_df))
+
+q_df <-rbind(q_male_df,q_female_df)
+```
+
+The plot code is below.
+
+There are two tricky bits
+
+Preventing ggplot from making the the y axis too tall : use coord_fixed and ylim Joining the percentile points : use geom_segment and fixed y values. The x values are given by the height valuesThe plot code is below.
+```{r}
+library(dplyr)
+# calculate the x-axis limits. These will be the min and max values of the heights data frame.
+
+xmax<-max(heights$height)
+xmin<-min(heights$height)
+
+# y values to use for each 'strip' of values
+y_up <- 4.5
+y_down <- 3.25
+
+# create the start and end points for each line segment
+
+# the x-end points for each segment are the height values of the male subjects in the data. I use a full-join to get the corresponding male height value for a percentile in the same row as the female value
+
+q_df<-q_df%>%full_join(q_df%>%filter(gender=='m'), by="percentile")%>%select(height.x, percentile, gender.x, height.y)%>%rename(c(height= height.x, gender=gender.x, x_end=height.y))%>%mutate(x_end=replace(x_end, gender=='m', NA))
+
+q_df$y<-ifelse(q_df$gender == "m",y_up, y_down)
+
+q_df$x_start<-ifelse(q_df$gender == "f",q_df$height, NA)
+q_df$y_start<-ifelse(q_df$gender == "f",q_df$y, NA)
+q_df$y_end<-ifelse(q_df$gender == "f",y_up, NA)
+
+# create a field for the percentile label to show
+q_df$label<-as.character(ifelse(q_df$gender == "m",q_df$percentile, NA))
+```
+
+```{r}
+#%>%select(height, percentile)
+gg <-
+  ggplot(data=q_df, aes(x=height, y=y, colour=gender, label = label )) +
+  
+   # label the percentiles
+  geom_text(
+    size = 2.5,
+    nudge_y = 0.25,
+    colour="black"
+  ) +
+   # add line segments between the percentiles on each strip
+  geom_segment(
+    aes(
+      x = x_start,
+      y = y_start,
+      xend= x_end,
+      yend = y_end,
+    ),
+    size = 0.1,
+    col = "black",
+    show.legend = F
+  ) +
+  
+  geom_point(
+    size = 2.5
+  ) +
+  
+
+  scale_x_continuous(breaks= seq(140,200,by=5), limits = c(xmin, xmax), name = "centimetres") +
+  
+  scale_colour_manual(values = c("#66c2a5", "#8da0cb")) +
+  
+   coord_fixed(ratio = 5) +
+  
+  ylim(c(3, 5)) +
+  
+  theme_classic() +
+  
+  ggtitle("Percentiles") +
+  
+  theme(
+    axis.line.y = element_blank(),
+    axis.text.y = element_blank(),
+    axis.ticks.y = element_blank(),
+    axis.title.y = element_blank(),
+    legend.position = c(0.05, 0.9),
+    # customised the legend postion so that it is in the plot
+    legend.title = element_text(size = 8, face = "bold"),
+    legend.text = element_text(size = 8, face = "bold"),
+    plot.title = element_text(size = 10, hjust = 0.5),
+    axis.line.x = element_line(size=0.1, colour="black"),
+     axis.title.x = element_text(size=9),
+  )
+
+  
+ gg
+```
+
+### Distribution Deviation plots
+
+This type of plot explicitly shows the difference in percentile values between two distributions. In this case, the difference between make and female height values are all positive. For another two distributions, it might be a mixture of positive and negative differences, in which case you will need to show a scale with positive and negative values on the y-axis. For this comparison, however, we can limit the range of the y-axis to positive values.
+
+Note
+
+```{r}
+q_diff = q_male_df['height'] -q_female_df['height'] 
+q_diff$percentile <- factor(rownames(q_diff), levels= rownames(q_diff))
+
+
+ggplot(q_diff, aes(x=percentile, y = height )) + 
+  
+  geom_segment(aes(xend = percentile), yend = 0, colour="grey60", size=0.20, linetype = "dotted") +
+  
+  geom_point(size = 2, col = "steelblue4" ) +
+ # geom_hline(yintercept = 0, size =1) +
+ # coord_cartesian(ylim = c(-17, 17)) +
+ # scale_y_continuous(breaks=seq(-18,18,2)) +
+  
+  scale_y_continuous(breaks=seq(0,20,2), limits = c(10, max(q_diff$height)))+
+  
+  ylab("Height Difference") +
+  
+  ggtitle("Per percentile difference between male and female heights") +
+  
+  theme_minimal() +
+  
+  theme(
+  axis.line.x = element_blank(),
+  panel.grid.major.y =element_line(colour = "gray95", size=0.2),
+  panel.grid.minor.y =element_blank(),
+  panel.grid.major.x =element_blank(),
+  axis.text.y =  element_text(size = 8),
+  axis.text.x =  element_text(size = 8),
+  axis.title.y = element_text(size = 10),
+  axis.title.x = element_text(size = 10),
+  plot.title = element_text(size = 12, hjust = 0.5)
+  
+) 
+```
+
