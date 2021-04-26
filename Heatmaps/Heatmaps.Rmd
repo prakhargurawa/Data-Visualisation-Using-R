@@ -1,0 +1,342 @@
+---
+title: "Heatmaps"
+output: html_notebook
+---
+
+## Time Series Heat Maps
+
+A heatmap visualises data through variations in colouring. It is essentially a colour coding of a 2-variable table
+
+Heatmaps are good for showing variance across multiple variables, revealing any patterns, displaying whether any variables are similar to each other, and for detecting if any correlations exist in-between them
+
+Typically, all the rows are one category (labels displayed on the left or right side) and all the columns are another category (labels displayed on the top or bottom).
+
+The cells contained within the table either contain colour-coded categorical data or numerical data, that is based on a colour scale.
+
+The value of the colour coded cell can represent the raw value from the corresponding input matrix, or a z-score, which represents the number of standard deviations an observation is from the mean.
+
+Because of their reliance on colour to communicate value, Heatmaps are ideal for presenting general patterns in the data rather than specific values
+
+Heatmaps can also be used to show the changes in data over time if one of the rows or columns are set to time intervals. In this section, our example will be based on measles outbreak data from 1928 to 2002 in the US.
+
+### Read the data
+
+```{r}
+library(readr)
+library(dplyr)
+library(tidyr)
+library(ggplot2)
+library(lubridate)
+library(knitr)
+library(kableExtra)
+
+dis <-"MEASLES"
+
+vacine_introduced <-c("MUMPS"=1967, "MEASLES"=1963, "HEPATITIS A" = 1996,"PERTUSSIS"=1965, "POLIO"=1955,"RUBELLA"= 1971, "SMALLPOX"=NA)
+
+# read in two data sets - one for 2018 and one for 2019
+us_disease_data<-read_csv("ProjectTycho_Level1_v1.0.0.csv")
+
+disease<-us_disease_data%>%filter(disease==dis)
+
+kable(head(disease),
+      digits = 2,
+      format = "html",
+      row.names = TRUE) %>%
+  kable_styling(
+    bootstrap_options = c("striped"),
+    full_width = F,
+    font_size = 12
+  ) %>%
+  column_spec(column = 3, width = "8em")
+```
+
+### Convert epi_week to year and week
+
+The snap shot of the data shows that the time value is a actually a sequential set of values defined as epi_week values. This is a standard epidemiological time stamp format and it gives the year and week of the year (up to 52) for each row of values.
+
+As we wish to plot yearly values, we have two pre-processing steps to take. First we need to convert the epi_week values to standard year and week values.
+
+Using the substring function on the the epi_week values we create two new columns with year and week values respectively
+
+```{r}
+# convert epidweek to standard year and week values
+disease<-disease %>% mutate(year=as.integer(substring(as.character(epi_week), 1, 4))) %>%
+  mutate (week=as.integer(substring(as.character(epi_week), 5, 6)))
+
+kable(head(disease),
+      digits = 2,
+      format = "html",
+      row.names = TRUE) %>%
+  kable_styling(
+    bootstrap_options = c("striped"),
+    full_width = F,
+    font_size = 12
+  ) 
+```
+### Calculate yearly means
+```{r}
+disease_year <- disease %>%
+  group_by(year, loc) %>%
+  summarise(ave_incidence_per_100000 = mean(incidence_per_100000))
+
+
+kable(head(disease_year),
+      digits = 2,
+      format = "html",
+      row.names = TRUE) %>%
+  kable_styling(
+    bootstrap_options = c("striped"),
+    full_width = F,
+    font_size = 12
+  ) 
+```
+
+###Make an initial plot
+```{r}
+ggplot(disease_year, aes(x=year, y=loc, fill = ave_incidence_per_100000)) + 
+  
+  geom_tile(colour = "white") +
+  
+  scale_y_discrete(name = NULL, expand = c(0,0)) +
+  
+  scale_x_continuous(name = NULL, expand = c(0,0), breaks = seq(1930,2000, by=10)) +
+ 
+  
+  scale_fill_viridis_c(option = "B", begin = 0.1, end = 0.9, direction = -1,
+                       name = "incidence per 100,000", 
+                       guide = guide_colourbar(direction = "horizontal", barwidth = 8, barheight = 0.8)) +
+ 
+  
+   #geom_vline(xintercept = vacine_introduced, colour = "black", alpha=0.8) +
+  
+  ggtitle(paste0(dis, " cases per 100,000 people: US States 1928 to 2002")) +
+  
+  coord_cartesian(clip = 'off') +
+  
+  theme(axis.text.y = element_text(size=5.6),
+        axis.ticks.x = element_line(size=0.3, colour = "darkgrey"),
+        axis.line.x = element_line(size=0.3, colour = "darkgrey"),
+        axis.ticks.y = element_blank(),
+        axis.line.y = element_blank(),
+        panel.background = element_blank(),
+        panel.grid = element_blank(),
+        plot.margin = unit(c(0.5, 0.5, 2, 0.5), "cm"),
+        plot.title = element_text(size=8, face="bold")) +
+  
+  theme(
+    legend.text = element_text(size = 8),
+    legend.position = c(0.55, -0.2), # move to the bottom
+    legend.title = element_blank(),
+    legend.key.size = unit(0.9, "line"),
+    legend.spacing.x = unit(0.2, 'cm'),
+    legend.background = element_rect(
+      fill = "white",
+      size = 0.5,
+      colour = "white"
+    )
+    ) 
+```
+
+### Order the rows
+
+We want to order the rows by average incidence rate. As several states appear to have no values for some years (e.g Alaska), we will impute a mean value so that when we calculate the incidence rate these states do not have a disproportionately high/low incidence rate.
+
+We have to transform the data to wide format and then for each year fill each NA with a mean value. This is the easiest way (that I know) to fill impute the missing values.
+
+```{r}
+# wide format
+disease_year_wide <- disease_year%>%spread(year, ave_incidence_per_100000)
+disease_year_wide<-as.data.frame(disease_year_wide)
+
+# showing the data in wide form before missing values imputed
+kable(head(disease_year_wide)[,1:10],
+      digits = 2,
+      format = "html",
+      row.names = TRUE, caption = "Snap shot of data in wide form BEFORE missing values imputed") %>%
+  kable_styling(
+    bootstrap_options = c("striped"),
+    full_width = F,
+    font_size = 12
+  ) 
+```
+```{r}
+# impute each NA value with year's mean
+for(i in 2:ncol(disease_year_wide)){
+  disease_year_wide[is.na(disease_year_wide[,i]), i] <- mean(disease_year_wide[,i], na.rm = TRUE)
+}
+
+# showing the data in wide form AFTER missing values imputed
+kable(head(disease_year_wide)[,1:10],
+      digits = 2,
+      format = "html",
+      row.names = TRUE,caption = "Snapshot of data in wide form AFTER missing values imputed") %>%
+  kable_styling(
+    bootstrap_options = c("striped"),
+    full_width = F,
+    font_size = 12
+  ) 
+```
+```{r}
+disease_year2<- disease_year_wide%>%
+  gather(year, ave_incidence_per_100000,2:ncol(disease_year_wide) )
+```
+
+```{r}
+#get average incidence per location, order in ascending order 
+disease_year2%>%
+  group_by( loc)%>%
+ summarise(mean_incidence=mean(ave_incidence_per_100000))%>%
+  arrange(mean_incidence)%>%
+  select(loc,mean_incidence )->disease2_loc_ordered_incidence
+
+# We set the y-axis ordering in the heat map to the order of the
+# states in disease2_loc_ordered_incidence
+# To do this we set the levels of the loc variable 
+# in the original disease_year data frame to the order of states in 
+# disease2_loc_ordered_incidence
+
+disease_year<-disease_year %>% 
+  mutate(loc=factor(loc, levels =disease2_loc_ordered_incidence$loc ))
+
+# showing the state ordering 
+kable(head(disease2_loc_ordered_incidence),
+      digits = 2,
+      format = "html",
+      row.names = TRUE,caption = "Snap shot of ranked US states by mean yearly incidence of measles outbreaks (per 100,000). 1928-2002 - Ascending order") %>%
+  kable_styling(
+    bootstrap_options = c("striped"),
+    full_width = F,
+    font_size = 12
+  ) 
+```
+
+### Plot heatmap with ordered rows
+
+```{r}
+vacine <- as.integer(vacine_introduced[dis])
+
+ggplot(disease_year, aes(x=year, y=loc, fill = ave_incidence_per_100000)) + 
+  
+  geom_tile(colour = "white") +
+  
+  scale_y_discrete(name = NULL, expand = c(0,0)) +
+  
+  scale_x_continuous(name = NULL, expand = c(0,0), breaks = seq(1930,2000, by=10)) +
+ 
+  
+  scale_fill_viridis_c(option = "B", begin = 0.1, end = 0.9, direction = -1,
+                       name = "incidence per 100,000", 
+                       guide = guide_colourbar(direction = "horizontal", barwidth = 8, barheight = 0.8)) +
+ 
+  
+   geom_vline(xintercept = vacine, colour = "black", alpha=0.6, na.rm = T) +
+  
+   annotate("text", x = vacine + 6.1, y = 53, label = "Vaccine introduced", size = 2.6) +
+  
+  ggtitle(paste0(dis, " cases per 100,000 people: US States 1928 to 2002")) +
+  
+  coord_cartesian(clip = 'off') +
+  
+  theme(axis.text.y = element_text(size=5.6),
+        axis.ticks.x = element_line(size=0.3, colour = "darkgrey"),
+        axis.line.x = element_line(size=0.3, colour = "darkgrey"),
+        axis.ticks.y = element_blank(),
+        axis.line.y = element_blank(),
+        panel.background = element_blank(),
+        panel.grid = element_blank(),
+        plot.margin = unit(c(0.5, 0.5, 2, 0.5), "cm"),
+        plot.title = element_text(size=8, face="bold")) +
+  
+  theme(
+    legend.text = element_text(size = 8),
+    legend.position = c(0.55, -0.2), # move to the bottom
+    legend.title = element_blank(),
+    legend.key.size = unit(0.9, "line"),
+    legend.spacing.x = unit(0.2, 'cm'),
+    legend.background = element_rect(
+      fill = "white",
+      size = 0.5,
+      colour = "white"
+    )
+    ) 
+```
+We have arranged the rows in descending order of average_incidence.
+
+While there is a visual pattern – we can see a cohort of STATES at the top had persistently high measles incidence. However, there doesn’t seem to be any geographic coherence to those states being a mixture of east coast and mid-western states.
+
+That’s because our ranking function was based on mean_incidence. We didn’t take the time ordering of each outbreak into account. In many cases like a simple ranking like this is fine.
+
+
+###Clustering the rows
+
+Very often though the rows in heat maps are not ranked - instead they are arranged according to similarity. The similarity function is usually very simple – very often it is is the Pearson coefficient , which measures correlation. In our case, if two states were correlated in terms of measles outbreaks, then their incidence score per years would be similar.
+
+If state A and state B are correlated, then if A had a high number of cases in 1928 we could expect state B to have also a high number of cases in 1928;
+
+As diseases know no political boundaries, we might also expect bordering states to be correlated. If we used correlation as basis for grouping states on the y-axis we might expect to see together some groups of states that are in the same geographic region.
+
+Let’s test this idea out.
+
+We are going to use a dedicated heatmap function called heatmap.2. It’s in the gplots library so you will have to install that.
+
+heatmap.2 has quite a lot of options - and I’ve chosen a few to enable a visualisation configuration that is similar to what we have just done - but where the rows are clustered by Pearson coefficient similarity. The clustering algorithm is a agglomerative and like all such algorithms, it requires you to pre-calculate a distance matrix, giving the pairwise distance between the rows - according to some distance measure.
+
+We set the names of the rows to be the location values (i.e.the state names). The clustering algorithm will present outputs in terms of row names.
+
+
+```{r}
+library(gplots)
+rownames(disease_year_wide)<-disease_year_wide$loc
+
+disease_year_wide<-disease_year_wide[,-1]
+```
+We will correlate the pre-vaccine years. As the vaccine took some time to take hold we’ll select the years 1928 to 1966.
+
+We’ll use the grouping based on this clustering for the heat map
+
+
+```{r}
+library(viridis)
+
+# select years 1928 to 1966
+disease_year_pre_vac <- disease_year_wide[,1:39]
+
+# As correlation (cor) is a similarity measure and dist requires a distance measure, we convert a similarity measure to a distance measure using the equation : distance = 1- similarity
+
+# the dist function creates a distance matrix
+# the distance function (1-r)/2, where r is pearson correlation
+dist_mat <-dist((1-cor(t(disease_year_pre_vac), method="pearson"))/2)
+
+# hclust does the hierarchical clustering
+hr <- hclust(dist_mat, method="complete")
+
+## Plot heatmap. The heatmap.2 only take matrix objects
+mat<- as.matrix(disease_year_wide)
+```
+
+In the plot below, the rows are grouped by similarity and the dendogram on the left hand side shows the structure of the clustering
+
+There are two clear patches colour on the heatmap.
+
+I am not an epidemiologist, so I can’t explain these – but as data scientists, lets try to rule out random chance. Remember the hypothesis that the clustering should have uncovered measles outbreaks in neighbouring states. If we can find that to some extent – then we can say the row ordering is meaningful. We know the column ordering is fixed – so the patterns we are then viewing are non random.
+
+We’re going to do this informally by inspection by comparing the state groupings produced by the clustering to the the state’s geographical location. Of course, this idea holds for states where there are significant outbreaks. The clustering will also cluster those states with consistently low outbreaks. There is no reason to believe that these states should be geographically close. There similarity in terms of low disease incidence may be due to other reasons such as a similar public health policy.
+
+If you are not familiar with a dendogram the idea is the branching structure indicates the closeness of the similarity of the instances. The higher the branch is the less similar the items belonging to it are.
+
+
+### Plot the heat map with clustered rows
+
+```{r}
+# This replicates the colouring we uses earlier
+pal<-viridis(n=256,option = "B", begin = 0.1, end = 0.9, direction = -1,)
+
+heatmap.2(mat, col=pal, Rowv=as.dendrogram(hr), Colv = F, scale="none", density.info="none", trace="none", cexRow=0.6, cexCol = 0.5,lhei = c(1,7), key.xlab='cases per 100,000 people', key.title = NA, sepwidth=c(0.01,0.01),
+           sepcolor="white",
+           colsep=1:ncol(mat),
+           rowsep=1:nrow(mat),
+          margin=c(3, 7)
+          )
+```
+
