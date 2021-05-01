@@ -1,0 +1,153 @@
+---
+title: "Plotting Distribution of 2 Dimensional Data"
+output: html_notebook
+---
+his is shortish chapter that illustrates two topics
+
+How to handle overplotting
+Techniques for plotting 2 dimensional distributions
+The very first plot we produced in this module was a scatterplot of (x,y) values. There were relatively few data points, and you were required to separate them visually. We are now going to look at the challenge of showing the distribution of thousands of (x,y) values in 2D space. We will not be able to separate individual values as we did in the previous exercise. Instead we are interested in making visible the possible distributions that exist in the data. Generally, this means visualising the different data densities - the number of points in a particular space in the plot. As multiple data points will be overlaid on each other, there is a significant overplotting challenge.
+
+To illustrate this topic, I create a synthetic data set composed of three bi-variate normal distributions of 5000 (x,y) values each, making a data set of 15000 values. The goal is to be able to visualise the two distributions with this data. We should realise, of course, that with real data, we would not know in advance how the data was composed.
+
+
+```{r}
+library(ggplot2)
+library(MASS)
+
+
+# code to synthesise data representing two bi-variate normal distributions
+m <-5000
+n <-5000
+p <-5000
+
+set.seed(1234)
+x <- c(rnorm(m, mean = -1.2), rnorm(n, mean = 1.4), rnorm(n, mean = -0.3)) # first m are x values for the first group
+y <- c(rnorm(m, mean = 0.7), rnorm(n, mean = 1.6), rnorm(n, mean = 4.7))# first m are y values for the first group
+
+group <- as.factor(rep(c(1,2,3), m+n+p))
+df2 <- data.frame(x, y, group)
+```
+
+The standard plot we have produced doesn’t help us at all.
+
+It gives no sense of the different data densities in the plot - the number of points in a particular space in the plot
+
+```{r}
+# code to create a standard theme for a plot
+commonTheme = list(labs(x="RNA-seq Expression",
+                        y="Microarray Expression"),
+                   theme_bw(),
+                   theme(legend.position=c(0,1),
+                         legend.justification=c(0,1)))
+
+
+# code to plot the data
+p<- ggplot(data=df2,aes(x,y)) + commonTheme 
+p + geom_point( color = "black")
+```
+
+This data is composed of two bi-variate normal distributions. This is not something we would know in advance during exploratory analysis.
+
+The standard plot we have produced doesn’t help us at all.
+
+It gives no sense of the different data densities in the plot - the number of points in a particular space in the plot
+
+Reducing the Size of Data objects
+Sometimes the problem can be solved by reducing the size of the points. The plot below is certainly better than the first, and seems to suggest three distributions underlying the data
+
+
+```{r}
+p + geom_point(color = "black", size = 0.25) # point size = 0.25
+```
+
+Removing the Fill Colour from the Data Points
+This technique should allow us to see better how the objects overlap. In ggplot2 we choose a shape such as shape 1 from the table below, which does not have a fill.
+
+
+Although this technique is often useful, it hasn’t helped much in this case
+```{r}
+p + geom_point(colour="black", shape=1, size = 0.5) + 
+  commonTheme 
+```
+
+Changing the Shape of Data objects
+Another approach is to use represent each data point using a shape that doesn’t occupy too much space. For example, a plus sign or an x
+
+
+```{r}
+p + geom_point(colour="black", shape=4, size = 0.5)
+```
+
+This approach combined with small size can help - but does not reduce overplotting when multiple objects encode the same value
+
+Jittering Data points
+A standard technique to reduce overplotting is to change something about the data rather than the appearance of the data point. Jittering adds a small amount of random noise to each point.
+
+You can achieve this using the geom_jitter instead of geom_point. The limit of the random noise is represented by the width and height attributes.
+
+Jittering here doesn’t give us a great sense of the regions of density in the plot. In this case it works better in conjunction with a shape that doesn’t take up too much room.
+
+In general, jittering works well with smaller data sets where there are localised regions of significant overlap
+```{r}
+p  +
+  geom_jitter(stat = "identity", colour="black", size = 0.5,
+  width = 0.05, height = 0.05, na.rm = FALSE,  show.legend  = NA, inherit.aes = TRUE)
+```
+Making Data points Transparent
+We’ve seen that this technique can be very successful in allowing you to visualise multiple overlapping points.
+
+The level of transparency required will depend on the the amount of overplotting.
+
+In the plot below, I had to combine a low alpha score and a low point size before the shape of the data started to appear.
+
+Try increasing the alpha and size to see the effect,
+
+```{r}
+p + geom_point(colour="black", alpha=0.1, size = 0.5)
+```
+Visually Encode the density of regions of the plot
+An alternative approach is to estimate the density of points within regions of the 2-D plane and encode the density rather than the points themselves.
+
+The smoothScatter function is not part of ggplot - but produces acceptable smoothed density plots
+```{r}
+library(hexbin)
+
+with(df2, smoothScatter(x, y, main="Scatter Plot Coloured by Smoothed Densities"))
+```
+
+with(df2,{
+  bin <-hexbin(x,y,xbins=100)
+  plot(bin, main="Hexagonal Binning with 8,000 observations")
+})
+
+The example below overlays coloured contours on the plot which represent different data densities.
+
+The densities are estimated using the kde2d function.
+
+```{r}
+p + geom_point(colour="black", alpha=0.4, size = 0.75) + 
+  geom_density2d(aes(colour=..level..)) +
+  scale_colour_gradient(low="green",high="red") 
+```
+5.1 Partitioning the space into bins
+
+In the following example, the 2D space is partitioned in hexagonal bins and a scale_fill_gradient is applied to visually encode the point density in each hexagon.
+
+The stat_binhex function has a bins argument specifying number of bins in both x and y directions. It is set to 30 by default.
+
+Try increasing/decreasing the bins to produce different visual granularities of point density
+
+```{r}
+library(hexbin)
+p + geom_point( color = "white") +
+  stat_binhex(bins = 30) + 
+  scale_fill_gradient(low="lightblue", high="red") 
+```
+```{r}
+library(hexbin)
+p + 
+  stat_bin2d(bins = 30) + 
+  scale_fill_gradient(low="lightblue", high="red") 
+```
+
