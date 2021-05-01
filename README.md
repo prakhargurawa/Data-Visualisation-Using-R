@@ -7,6 +7,8 @@
 
 ![alt text](https://github.com/prakhargurawa/Data-Visualisation-Using-R/blob/main/Images/vbn.png?raw=true)
 
+![alt text](https://github.com/prakhargurawa/Data-Visualisation-Using-R/blob/main/Distribution-of-2D-Data/hexmap.png?raw=true)
+
 ![alt text](https://github.com/prakhargurawa/Data-Visualisation-Using-R/blob/main/Images/jk.png?raw=true)
 
 ![alt text](https://github.com/prakhargurawa/Data-Visualisation-Using-R/blob/main/Images/dasa.png?raw=true)
