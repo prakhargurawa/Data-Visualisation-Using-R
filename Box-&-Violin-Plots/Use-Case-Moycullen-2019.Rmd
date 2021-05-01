@@ -1,0 +1,321 @@
+---
+title: "Visualising Moycullen 2019 Temperatures"
+output: html_notebook
+---
+
+There are 12 files to read - one for each month. I read each one and then merge them into a single dataframe.
+
+```{r}
+library(readr)
+library(dplyr)
+
+path<- "moycullenweather2019/"
+
+file<-paste0(1,"2019lg.txt")
+mw<- read.table(paste0(path,file),sep = "", header=TRUE)
+
+for(i in 2:12){
+  file<-paste0(i,"2019lg.txt")
+  mw1<- read.table(paste0(path,file),sep = "", header=TRUE)
+  mw<-rbind(mw, mw1)
+}
+
+# just need first 6 columns
+mw_temp_19<-mw[,1:6]
+
+mw_temp_19<- mw_temp_19%>%
+  mutate(monthname = case_when(
+    month == 1  ~ "January",
+      month == 2  ~ "February",
+     month == 3  ~ "March",
+      month == 4  ~ "April",
+      month == 5  ~ "May",
+      month == 6  ~ "June",
+      month == 7  ~ "July",
+      month == 8  ~ "August",
+      month == 9  ~ "September",
+    month == 10  ~ "October",
+     month == 11  ~ "November",
+      month == 12  ~ "December"
+    )
+  )
+```
+Using dplyr I calculate an hourly average temperature for each hour in the year. I also give the numeric month values a string label
+
+```{r}
+library(dplyr)
+
+mw_hourly_temp19 <- mw_temp_19%>%
+  group_by(monthname, day, hour)%>%
+  dplyr::summarize(mean_hourly_temp = round(mean(temperature),1))
+
+
+
+
+# mw_hourly_temp19<- mw_hourly_temp19%>%
+#   mutate(monthname = case_when(
+#     month == 1  ~ "January",
+#       month == 2  ~ "February",
+#      month == 3  ~ "March",
+#       month == 4  ~ "April",
+#       month == 5  ~ "May",
+#       month == 6  ~ "June",
+#       month == 7  ~ "July",
+#       month == 8  ~ "August",
+#       month == 9  ~ "September",
+#     month == 10  ~ "October",
+#      month == 11  ~ "November",
+#       month == 12  ~ "December"
+#     )
+#   )
+
+mw_hourly_temp19$monthname <-
+  factor(
+    mw_hourly_temp19$monthname,
+    levels = c(
+      "December",
+      "November",
+      "October",
+      "September",
+      "August",
+      "July",
+      "June",
+      "May",
+      "April",
+      "March",
+      "February",
+      "January"
+    )
+  )
+```
+
+### Multiple Strip Plots
+
+The first plot we will do is a strip plot, with one strip of points per month. Each point represents the average temperature recorded in one hour during that month.
+
+```{r}
+library(ggplot2)
+library(plotly)
+
+g<- ggplot(mw_hourly_temp19) + 
+  geom_point(aes(x = mean_hourly_temp , y= monthname ), col= "grey30", 
+             size = 0.5, alpha = 0.2, 
+             position = position_jitter(width = 0.3),  show.legend=F) +
+  
+  scale_x_continuous(expand=c(0,0),breaks = seq(-5,25,by=5), limits= c(-5,25),name = "Celcius") +
+
+  ggtitle("Moycullen Hourly Temperatures 2019") +
+  theme_minimal() +
+  theme (
+    panel.grid.major.y =element_line(colour = "gray95", size =0.25),
+    panel.grid.major.x =element_line(colour = "gray95", size =0.25),
+    panel.grid.minor.y =element_line(colour = "gray95", size =0.15),
+    axis.title.y = element_blank(),
+    plot.title = element_text(size=10))
+
+g
+```
+```{r}
+fig <- ggplotly(g)
+fig
+```
+###  Interactive Strip plot
+
+We can add a colour gradient if we want to emphasis the warming trend for values to the right of the chart.
+
+Note also that I have made this plot interactive using the ggplotly function from the plotly library.
+
+This piece of code creates the label to display when the cursor hovers over a data point.
+
+```{r}
+library(dplyr)
+
+mw_hourly_temp19<- mw_hourly_temp19%>%
+  mutate(Date = paste0(monthname, " ", day, "\n Hour: ", hour,"\nTemperature: ", mean_hourly_temp ))
+```
+
+```{r}
+library(ggplot2)
+library(plotly)
+library(viridis)
+
+g<- ggplot(mw_hourly_temp19) + 
+
+  geom_point(aes(x = mean_hourly_temp , y= monthname, colour= mean_hourly_temp, label = Date), 
+             size = 0.5, alpha = 0.2, 
+             position = position_jitter(width = 0.3), show.legend=F) +
+  scale_x_continuous(expand=c(0,0),breaks = seq(-5,25,by=5), limits= c(-5,25),name = "Celcius") +
+  scale_y_discrete() +
+ # the viridis colour scale to represent the change in temperature
+ scale_colour_viridis_c(option = "B", begin = 0.1, end = 0.95, direction = 1,
+                       name = "Temp. [C]") +
+   
+ ggtitle("Moycullen Hourly Temperatures 2019") +
+  theme_minimal() +
+  theme (
+    panel.grid.major.y =element_line(colour = "gray95", size =0.25),
+    panel.grid.major.x =element_line(colour = "gray95", size =0.25),
+    panel.grid.minor.y =element_line(colour = "gray95", size =0.15),
+    axis.title.y = element_blank())
+
+fig <- ggplotly(g,tooltip = c("label"))
+fig
+```
+
+### Multiple Box Plots
+
+```{r}
+library(ggplot2)
+
+g<- ggplot(mw_hourly_temp19,aes(y = mean_hourly_temp , x= monthname )) + 
+  
+  geom_boxplot(fill = "gray95", colour = "gray30", show.legend=F, 
+               outlier.colour = "grey30", 
+               outlier.shape = 1, size=0.25) +
+  coord_flip()+
+  scale_y_continuous(expand=c(0,0),breaks = seq(-5,25,by=5), 
+                     limits= c(-5,25),name = "Celcius") +
+
+  ggtitle("Moycullen Hourly Temperatures 2019") +
+  theme_minimal() +
+  theme (
+    panel.grid.major.y =element_line(colour = "gray95", size =0.25),
+    panel.grid.minor.x =element_line(colour = "gray95", size =0.15),
+    panel.grid.major.x =element_line(colour = "gray95", size =0.25),
+    
+    axis.title.y = element_blank(),
+    plot.margin = margin(t = 2, r = 10, b = 2, l = 4, "pt"),
+    plot.title = element_text(size=10))
+
+g
+```
+
+The plot shown below shows the actual distribution of data values - but also superimposes key statistical measurements of median, interquarterile range, maximum, minimum and the identification of extreme values (outliers)
+
+```{r}
+library(ggplot2)
+
+g<- ggplot(mw_hourly_temp19,aes(y = mean_hourly_temp , x = monthname )) + 
+  
+   geom_point(col= "grey30", size = 0.42, alpha = 0.12, 
+               position = position_jitter(width = 0.3)) +
+   geom_boxplot(colour = "gray30", show.legend=F, 
+               outlier.shape = NA, 
+               varwidth = TRUE, alpha=0, size=0.3) +
+  coord_flip() +
+  scale_y_continuous(expand=c(0,0), breaks = seq(-5,25,by=5), 
+                     limits= c(-5,25),name = "Celcius") +
+  ggtitle("Moycullen Hourly Temperatures 2019") +
+  theme_minimal() +
+  theme (
+    panel.grid.major.y =element_line(colour = "gray95", size =0.25),
+    panel.grid.minor.x =element_line(colour = "gray95", size =0.15),
+    panel.grid.major.x =element_line(colour = "gray95", size =0.25),
+    axis.title.y = element_blank(),
+    plot.margin = margin(t = 4, r = 10, b = 4, l = 4, "pt"),
+    plot.title = element_text(size=10))
+
+g
+```
+### Multiple Violin Plots
+
+The box plot however does not give an indication of the shape of each distribution. A violin plot, as it is based on kernel density estimation, will indicate better the shape of the distribution.
+
+I think that a violin plot, if executed so that the key pieces of information stand out can be more immediately informative than a standard box-plot. Take the plot below. The key information is actually carried by the enclosed, reduced box-plot : median, interquartile values and outliers. These are immediately visible, as we have condensed the box plot down to a single black line with a white median point and whiskers. The violin shape is extemely light and provides information about the count density. It is really easy to scan the down the plot and perceive the changing median values, and the shift in position and width of the interquartile values, indicated by the blackline - easier, I would argue, than doing the same with the standard box plot that I created above.
+
+```{r}
+library(ggplot2)
+
+g<- ggplot(mw_hourly_temp19,aes(y = mean_hourly_temp , x= monthname )) + 
+    # outline of violin shape, which is a mirror kernel density estimate         
+    geom_violin(fill = NA, scale = "count", 
+            col="black", show.legend=F, size=0.1) +
+    # overlay a boxplot with fill = "black". No outliers should be shown
+    geom_boxplot(fill="black", width = 0.08, 
+             size=0.1, outlier.colour = "grey30", 
+             outlier.shape = 1, outlier.size = 0.07) +
+    # stat summary calculates the median and represents it using a white point
+    stat_summary(fun.y = median, geom="point", 
+             fill = "white", shape = 21, size= 1.5) +
+    coord_flip()+
+    scale_y_continuous(expand=c(0,0), breaks = seq(-5,25,by=5), 
+                     limits= c(-5,25), name = "Celcius") +
+    ggtitle("Moycullen Hourly Temperatures 2019") +
+    theme_minimal() +
+    theme (
+      panel.grid.major.y =element_line(colour = "gray95", size =0.25),
+      panel.grid.minor.x =element_line(colour = "gray95", size =0.15),
+      panel.grid.major.x =element_line(colour = "gray95", size =0.25),
+      axis.title.y = element_blank(),
+      plot.margin = margin(t = 4, r = 10, b = 4, l = 4, "pt"),
+      plot.title = element_text(size=10)
+    )
+
+g
+```
+
+###  Ridgeline Plots
+
+In terms of visualising multiple distribution shapes simultaneously, particularly where you want to understand if there is trend between them, the best I have come across is the ridgeline plot. The shape of the violin plot will give you the same indication of distribution shape as a ridgeline plot, plus the key summary statistics. However, there are many situations where your audience may not be prepared to parse a panel of violin plots, but will immediately and intuitively understand the information in a ridgeline plot - and that is their strength and beauty. They are also an also an exceptionally pretty graphic.
+
+A Ridgeline plot is a series of overlapping line plots that create the impression of a mountain range. Essentially, it is series of overlapping density plots. They can be quite useful for visualizing changes in distributions over time or space.
+
+The scale parameter in the geom_density_ridges function indicates a scaling factor to scale the height of the ridgelines relative to the spacing between them. A value of 1 indicates that the maximum point of any ridgeline touches the baseline right above, assuming even spacing between baselines.
+
+```{r}
+library(colorspace)
+library(ggridges)
+
+ggplot(mw_hourly_temp19, aes(x  = mean_hourly_temp, y = monthname)) + 
+  geom_density_ridges(fill = "steelblue4", 
+                      colour = "white", scale = 1.65) +
+  scale_x_continuous(expand=c(0,0),breaks = seq(-5,25,by=5), 
+                     limits= c(-5,25), 
+                     name = "mean hourly temperature (celcius)")+
+  ggtitle("Moycullen Hourly Temperatures 2019") +
+  
+  theme_minimal() +
+  theme(panel.grid.minor.y = element_blank(),
+        panel.grid.major.x = element_line(size = 0.4),
+        panel.grid.minor.x = element_blank(),
+        panel.grid.major.y = element_line(size = 0.4),
+        axis.text.y = element_text(size = 10),
+        axis.title.y = element_blank(),
+        panel.spacing = unit(0.5, "lines"),
+        plot.margin = margin(t = 4, r = 10, b = 4, l = 4, "pt"),
+        plot.title = element_text(size=10)) 
+```
+
+I want to suggest the warming trend on the right of each ridge. There is a separate ridgeline geometric to allow you to colour the ridge with a colour gradient :geom_density_ridges_gradient
+
+The gradient fill scale is mapped to the x values of the plot.
+
+Thw scale parameter indicates a scaling factor to scale the height of the ridgelines relative to the spacing between them. A value of 1 indicates that the maximum point of any ridgeline touches the baseline right above, assuming even spacing between baselines.
+
+```{r}
+library(colorspace)
+library(ggridges)
+library(viridis)
+
+ggplot(mw_hourly_temp19, aes(x  = mean_hourly_temp, y = monthname)) + 
+  # The gradient fill scale is mapped to the x values of the plot.
+  geom_density_ridges_gradient(aes(fill = ..x..),  
+                                  colour = "white", scale = 1.65) +
+  scale_fill_viridis(name = "Temp. [C]", option = "D", guide="none") +
+  
+  scale_x_continuous(expand=c(0,0),breaks = seq(-5,25,by=5), 
+                   limits= c(-5,25), 
+                   name = "mean hourly temperature [C]") +
+  ggtitle("Moycullen Weather 2019 - Mean Hourly Temperatures") +
+  theme_minimal() +
+  theme(panel.grid.minor.y = element_blank(),
+        panel.grid.major.x = element_line(size = 0.4),
+        panel.grid.minor.x = element_blank(),
+        panel.grid.major.y = element_line(size = 0.4),
+        axis.text.y = element_text(size = 10),
+        axis.title.y = element_blank(),
+        panel.spacing = unit(0.5, "lines"),
+        plot.margin = margin(t = 4, r = 10, b = 4, l = 4, "pt"),
+        plot.title = element_text(size=10)) 
+```
+
