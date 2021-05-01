@@ -1,0 +1,162 @@
+---
+title: "Comparing Multiple distributions"
+output: html_notebook
+---
+
+## Part 1 : Box plots and Violin plots
+
+### Example data with outliers
+
+```{r}
+library(knitr)
+library(kableExtra)
+
+set.seed(12566)
+
+height_range <- seq(80, 240, by = 1)
+
+# Male irish  mean height 179 cm with SD  7.6 cm
+male_height <- round(rnorm(height_range, mean = 179, sd = 7.6),2)
+# Female irish  mean height 164 cm with SD 7.2 cm
+female_height <- round(rnorm(height_range, mean = 163, sd = 7.2),2)
+
+# add some outliers
+male_height<-c(male_height, 140, 142, 205.6, 206.2, 207.2)
+female_height <- c(female_height, 133,135,196, 204, 206.4 )
+
+m<- factor(c("male","female"))
+
+male <- rep(m[1],length(male_height))
+female <- rep(m[2],length(female_height))
+
+m_height<-data.frame(male_height,male)
+names(m_height) <- c("height", "gender")
+f_height<-data.frame(female_height,female)
+names(f_height) <- c("height", "gender")
+
+heights<- rbind(m_height, f_height)
+```
+
+A strip plot gives a good indication of the distributions per gender value - though in its default format it lacks any indication of key distribution measurements such as median, interquartile range, max, min - and an explicit indication of outliers.
+
+### Box Plots
+
+A box plot provides a compact visual summary of the data distribution. It visualises five summary statistics
+
+the median,
+quartiles 1 and 3
+two “whiskers” indicating the range of max and min values
+all outliers individually.
+The upper whisker is the interval between Q3 and the maximum value in the data. The maximum value us defined as 1.5 * Interquartile Range. The lower whisker is the interval between Q1 and the minimum value. The minimum value is defined as 1.5 * Interquartile Range . Outliers are defined as all values that fall outside the maximum and minimum points.
+
+```{r}
+ggplot(heights, aes(y=height, x=gender)) +
+  
+  geom_boxplot(fill = "gray95", colour = "gray30", show.legend=F, outlier.colour = "firebrick", outlier.shape = 1) +
+  
+  scale_y_continuous(breaks=seq(130,210, by =10)) +
+  
+  coord_flip() +
+  
+  xlab("centimetres") +
+  
+  theme_minimal() +
+
+theme(
+  axis.text.y = element_text(size =10,face = "bold"),
+  axis.ticks.y =  element_blank(),
+  axis.title.y = element_blank(),
+  axis.title.x = element_text(size = 10),
+  axis.line.x = element_blank(),
+  axis.ticks.x = element_blank(),
+  axis.line.y = element_blank(),
+  panel.grid.minor.x = element_blank(),
+  panel.grid.major.y = element_blank(),
+  panel.grid.major.x = element_line(size=0.2))
+```
+The box plot makes it easy to compare distributions. We can see immediately the relative positions of the median lines. The width of each box indicates the interquartile spread (range) of each distribution. A narrow box indicates that the middle 50% of the values are crammed into a small interval. The distribution of female values has a narrower interquartile range than the distribution of male values.
+
+We can see can compare the maximum and minimum values of each distribution. For example, we can see than the female max value is approximately the same as the male median value. We can see that each distribution has a number of outliers, points coloured red, at either end. We know that’s true, because we put them there!
+
+An alternative approach (with moderate sample sizes) is to display the original data with jittering and alpha blending turned on to solve any overplotting.
+
+The outliers in the box plot can be turned off with outlier.color = NA so they are not shown twice.
+
+This my preferred format for box-plots. You still get the statistical summary of the box plot, but also a visual presentation of the actual data.
+
+```{r}
+ggplot(heights, aes(y=height, x=gender)) +
+  
+  geom_boxplot(colour = "gray30", show.legend=F, outlier.colour = NA, varwidth = TRUE) +
+  
+  geom_point(position = position_jitter(width = 0.1), alpha = 0.15)+
+  
+  scale_y_continuous(breaks=seq(130,210, by =10))+
+  
+  coord_flip() +
+  
+  xlab("centimetres") +
+  
+  theme_minimal() +
+
+  theme(
+    axis.text.y = element_text(size =10,face = "bold"),
+    axis.ticks.y =  element_blank(),
+    axis.title.y = element_blank(),
+    axis.title.x = element_text(size = 10),
+    axis.line.x = element_blank(),
+    axis.ticks.x = element_blank(),
+    axis.line.y = element_blank(),
+    panel.grid.minor.x = element_blank(),
+    panel.grid.major.y = element_blank(),
+    panel.grid.major.x = element_line(size=0.2))
+```
+### Violin Plots
+
+Hintze, J. L., Nelson, R. D. (1998), “Violin Plots: A Box Plot-Density Trace Synergism,” The American Statistician 52, 181-184.
+
+Violin plots are similar to box plots, except that they also show the kernel probability density of the data at different values. Typically, violin plots will include a marker for the median of the data and a box indicating the interquartile range, as in standard box plots.
+
+You consider a violin plot to be blend of a box plot and a density curve. The plot uses density estimates to show the distributions.
+
+By default the “violins” are scaled to have the same area. They can also be scaled to have the same maximum height or to have areas proportional to sample sizes. This is done by adding scale = “width” or scale = “count” to the geom_violin function.
+
+The basic violin plot is shown below. The wider parts of the plot indicate regions of the distribution where there are more data points.
+
+Typically, the violin plot is shown with the media and interquartile range displayed. This is achieved by adding a small box plot inside the violin.
+
+As I did with the boxplot, I have superimposed the data points onto the plot. You can see the darker regions match the wider parts of the plot. However this might make the plot a little busy
+
+```{r}
+ggplot(heights, aes(y=height, x=gender)) +
+#outline of violin shape, which is a mirror kernel density estimate
+# I like to keep the violin outline as thin as possible. The line size is 0.15  
+  geom_violin(fill = NA, scale = "count", col="black", show.legend=F, size =0.15) +
+# overlay a boxplot with fill = "black". No outliers should be shown
+  geom_boxplot(fill="black", width = .03, outlier.colour = "NA") +
+# stat summary calculates the median and represents it using a white point
+  stat_summary(fun.y = median, geom="point", fill = "white", shape = 21, size= 2) +
+  # add the data points as a strip plot
+  geom_point(position = position_jitter(width = 0.1), alpha = 0.15)+
+  # scale_y_discrete(expand=c(0,0))+
+  scale_y_continuous(breaks=seq(130,210, by =10))+
+  # scale_colour_manual(values = c("#66c2a5", "#8da0cb")) +
+  coord_flip() +
+  xlab("centimetres") +
+  theme_minimal() +
+  theme(
+    axis.text.y = element_text(size =10,face = "bold"),
+    axis.ticks.y =  element_blank(),
+    axis.title.y = element_blank(),
+    axis.title.x = element_text(size = 10),
+    axis.line.x = element_blank(),
+    axis.ticks.x = element_blank(),
+    axis.line.y = element_blank(),
+    panel.grid.minor.x = element_blank(),
+    panel.grid.major.y = element_blank(),
+    panel.grid.major.x = element_line(size=0.2)
+)
+```
+The violin plot shows exactly the same information as the box plot. However, as we have seen with density curves (also based on kernel density estimation), the width of the violin body indicates the density or number of points with particular values. In the plots above, we can see that the distribution of female values has a peak count close to the median, whereas the distribution of male values has two peaks, one on either side of the median - leading to a quite a different shape of violin body. Just by reading the shape of the violin plot, we would conclude that most of the female height values are clustered round the median.
+
+If you are planning to include the data points as a background, as I have done here, I suggest you keep the violin outline as light as possible. This type of plot becomes hard to read when there are lot of lines of similar width competing for your attention
