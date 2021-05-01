@@ -7,7 +7,13 @@
 
 ![alt text](https://github.com/prakhargurawa/Data-Visualisation-Using-R/blob/main/Images/vbn.png?raw=true)
 
-![alt text](https://github.com/prakhargurawa/Data-Visualisation-Using-R/blob/main/Distribution-of-2D-Data/hexmap.png?raw=true)
+![alt text](https://github.com/prakhargurawa/Data-Visualisation-Using-R/blob/main/Images/hexmap.png?raw=true)
+
+![alt text](https://github.com/prakhargurawa/Data-Visualisation-Using-R/blob/main/Images/newplot.png?raw=true)
+
+![alt text](https://github.com/prakhargurawa/Data-Visualisation-Using-R/blob/main/Images/Moycullen.png?raw=true)
+
+![alt text](https://github.com/prakhargurawa/Data-Visualisation-Using-R/blob/main/Images/Box.png?raw=true)
 
 ![alt text](https://github.com/prakhargurawa/Data-Visualisation-Using-R/blob/main/Images/jk.png?raw=true)
 
